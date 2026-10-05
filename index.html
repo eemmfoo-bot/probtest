@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#061e27">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -37,14 +37,26 @@
     --safe-bottom: env(safe-area-inset-bottom, 0px);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{overscroll-behavior-y:contain}
+  html,body{
+    overscroll-behavior-y:contain;
+    -webkit-font-smoothing:antialiased;
+    text-size-adjust:100%;
+    -webkit-text-size-adjust:100%;
+  }
   body{
     font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
     background:var(--bg-primary);
     color:var(--text-primary);
-    min-height:100vh;
+    min-height:100dvh;
     line-height:1.5;
     padding:calc(20px + var(--safe-top)) 20px calc(100px + var(--safe-bottom));
+  }
+  body.modal-open{
+    position:fixed;
+    left:0;
+    right:0;
+    width:100%;
+    overflow:hidden;
   }
   .wrap{max-width:1180px;margin:0 auto}
 
@@ -104,7 +116,7 @@
   .search input{
     width:100%;background:var(--bg-card);border:1px solid var(--border);
     color:var(--text-primary);padding:12px 14px 12px 42px;border-radius:10px;
-    font-size:14px;font-family:inherit;outline:none;transition:.2s;
+    font-size:16px;font-family:inherit;outline:none;transition:.2s;
   }
   .search input::placeholder{color:var(--text-muted)}
   .search input:focus{
@@ -203,6 +215,7 @@
     display:none;align-items:flex-start;justify-content:center;
     padding:calc(16px + var(--safe-top)) 12px calc(16px + var(--safe-bottom));
     overflow-y:auto;z-index:100;-webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
   }
   .overlay.open{display:flex}
   .modal{
@@ -239,7 +252,7 @@
   .field input,.field textarea,.field select{
     width:100%;background:var(--bg-card);border:1px solid var(--border);
     color:var(--text-primary);padding:12px 14px;border-radius:10px;
-    font-size:14px;font-family:inherit;outline:none;transition:.2s;resize:vertical;
+    font-size:16px;font-family:inherit;outline:none;transition:.2s;resize:vertical;
   }
   .field input::placeholder,.field textarea::placeholder{color:var(--text-muted)}
   .field input:focus,.field textarea:focus,.field select:focus{
@@ -258,7 +271,7 @@
   .ing-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
   .ing-head label{margin:0}
   .ing-row{display:grid;grid-template-columns:1fr 84px 68px 36px;gap:8px;margin-bottom:8px;align-items:center}
-  .ing-row input{padding:10px 12px;font-size:13.5px}
+  .ing-row input{padding:10px 12px;font-size:16px}
   .ing-row .del{
     background:transparent;border:1px solid transparent;color:var(--text-muted);
     cursor:pointer;font-size:16px;padding:0;height:40px;border-radius:8px;
@@ -491,7 +504,7 @@
         <label>Загрузить из файла</label>
         <input type="file" id="file-input" accept="application/json,.json"
                onchange="uploadBackup(this.files[0]); this.value='';"
-               style="padding:10px;font-size:13px;cursor:pointer">
+               style="padding:10px;font-size:14px;cursor:pointer">
         <div class="hint">
           Спрошу: заменить текущие данные или добавить к ним.
         </div>
@@ -621,11 +634,11 @@ function uploadBackup(file){
 function openSettings(){
   document.getElementById('s-local-count').textContent = items.length;
   document.getElementById('settingsOverlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
+  document.body.classList.add('modal-open');
 }
 function closeSettings(){
   document.getElementById('settingsOverlay').classList.remove('open');
-  document.body.style.overflow = '';
+  document.body.classList.remove('modal-open');
 }
 
 /* ---- Render ---- */
@@ -725,11 +738,11 @@ function openEditor(id){
 
   updateLoss();
   document.getElementById('overlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
+  document.body.classList.add('modal-open');
 }
 function closeEditor(){
   document.getElementById('overlay').classList.remove('open');
-  document.body.style.overflow = '';
+  document.body.classList.remove('modal-open');
   editingId = null;
 }
 
@@ -827,12 +840,12 @@ function openShare(){
   if(!editingId) return;
   sharingId = editingId;
   document.getElementById('shareOverlay').classList.add('open');
-  document.body.style.overflow = 'hidden';
+  document.body.classList.add('modal-open');
   buildShareText();
 }
 function closeShare(){
   document.getElementById('shareOverlay').classList.remove('open');
-  document.body.style.overflow = '';
+  document.body.classList.remove('modal-open');
   sharingId = null;
 }
 

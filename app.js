@@ -10,7 +10,6 @@ let items = [];
 let currentFilter = 'all';
 let currentCatFilter = 'all';
 let currentTagFilter = 'all';
-let currentDiffFilter = 'all';
 let editingId = null;
 let currentVersionIdx = 0;
 let sharingId = null;
@@ -154,7 +153,6 @@ function applyTheme(t){
   }
   try{ localStorage.setItem(LS_THEME, t); }catch(e){}
   updateThemeIcon();
-  // обновляем meta theme-color для мобилки
   const meta = document.querySelector('meta[name="theme-color"]');
   if(meta) meta.setAttribute('content', t === 'light' ? '#f4f1ec' : '#061e27');
 }
@@ -163,10 +161,8 @@ function updateThemeIcon(){
   if(!icon) return;
   const t = getCurrentTheme();
   if(t === 'light'){
-    // показываем солнце
     icon.innerHTML = '<circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>';
   } else {
-    // показываем луну
     icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>';
   }
 }
@@ -231,40 +227,15 @@ function renderTagFilters(){
     }).join('');
 }
 
-function renderDifficultyFilters(){
-  const used = new Map();
-  items.forEach(it=>{
-    const v = it.versions[it.currentVersion - 1];
-    if(!v || !v.difficulty) return;
-    used.set(v.difficulty, (used.get(v.difficulty) || 0) + 1);
-  });
-  if(used.size === 0){ document.getElementById('difficulty-filters').innerHTML = ''; return; }
-  // сортируем по порядку DIFF_ORDER
-  const sorted = DIFF_ORDER.filter(d => used.has(d));
-  // добавляем нестандартные, если есть
-  Array.from(used.keys()).forEach(d => { if(!DIFF_ORDER.includes(d)) sorted.push(d); });
-  document.getElementById('difficulty-filters').innerHTML =
-    `<div class="label-pill">Сложность</div>` +
-    `<div class="chip ${currentDiffFilter==='all'?'active':''}" onclick="setDiffFilter('all')">Все</div>` +
-    sorted.map(d=>{
-      const safe = esc(d).replace(/'/g,"\\'");
-      return `<div class="chip ${currentDiffFilter===d?'active':''}" onclick="setDiffFilter('${safe}')">
-        ${esc(d)}<span class="num">${used.get(d)}</span>
-      </div>`;
-    }).join('');
-}
-
 function setFilter(f){ currentFilter = f; render(); }
 function setCatFilter(c){ currentCatFilter = c; render(); }
 function setTagFilter(t){ currentTagFilter = t; render(); }
-function setDiffFilter(d){ currentDiffFilter = d; render(); }
 
 /* ====== РЕНДЕР СПИСКА ====== */
 function render(){
   renderStatusFilters();
   renderCatFilters();
   renderTagFilters();
-  renderDifficultyFilters();
   setStatus(false);
   const q = (document.getElementById('q').value || '').toLowerCase().trim();
   const sort = document.getElementById('sort').value;
@@ -276,7 +247,6 @@ function render(){
     if(currentFilter !== 'all' && v.status !== currentFilter) return false;
     if(currentCatFilter !== 'all' && it.cat !== currentCatFilter) return false;
     if(currentTagFilter !== 'all' && !parseTags(v.tags).includes(currentTagFilter)) return false;
-    if(currentDiffFilter !== 'all' && v.difficulty !== currentDiffFilter) return false;
     if(!q) return true;
     const hay = [
       it.title, it.cat, v.dishware, v.tags, v.ice, v.temp, v.garnish, v.difficulty,
@@ -337,64 +307,62 @@ function cardHTML(it){
   const iconCheck = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12 5 5 9-11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const iconChev = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-  let details = '';
-  if(isExpanded){
-    const parts = [];
-    if((v.ingredients||[]).length){
-      const ingHtml = v.ingredients.map(i=>{
-        const qty = i.qty ? ` — <b>${esc(i.qty)}${i.unit?' '+esc(i.unit):''}</b>` : '';
-        return `• ${esc(i.name)}${qty}`;
-      }).join('<br>');
-      parts.push(`<div class="detail-block">
-        <div class="detail-label">Состав</div>
-        <div class="detail-ing">${ingHtml}</div>
-      </div>`);
-    }
-    const serveParts = [];
-    if(v.ice) serveParts.push(esc(v.ice));
-    if(v.temp) serveParts.push(esc(v.temp));
-    if(v.garnish) serveParts.push('Гарнир: ' + esc(v.garnish));
-    if(v.time) serveParts.push('Время: ' + esc(v.time) + ' мин');
-    if(v.difficulty) serveParts.push('Сложность: ' + esc(v.difficulty));
-    if(serveParts.length){
-      parts.push(`<div class="detail-block">
-        <div class="detail-label">Подача</div>
-        <div class="detail-text">${serveParts.join(' · ')}</div>
-      </div>`);
-    }
-    if(v.before || v.after){
-      let yieldText = `${v.before||'—'} → ${v.after||'—'}${v.unit?' '+esc(v.unit):''}`;
-      const ch = calcChange(v.before, v.after);
-      if(ch){
-        const label = ch.diff > 0 ? 'прирост' : (ch.diff < 0 ? 'потери' : 'без изменений');
-        yieldText += ` · ${label} ${ch.sign}${ch.diff.toFixed(0)} (${ch.sign}${ch.pct.toFixed(1)}%)`;
-      }
-      parts.push(`<div class="detail-block">
-        <div class="detail-label">Выход</div>
-        <div class="detail-text">${esc(yieldText)}</div>
-      </div>`);
-    }
-    if(v.cost || v.price){
-      const fc2 = calcFC(v);
-      const items2 = [];
-      if(v.cost) items2.push(`Себестоимость: <b>${esc(v.cost)} ₽</b>`);
-      if(v.price) items2.push(`Цена: <b>${esc(v.price)} ₽</b>`);
-      if(fc2 !== null) items2.push(`FC: <b>${fc2.toFixed(1)}%</b>`);
-      parts.push(`<div class="detail-block">
-        <div class="detail-label">Экономика</div>
-        <div class="detail-econ">${items2.join(' · ')}</div>
-      </div>`);
-    }
-    if(v.need) parts.push(`<div class="detail-block"><div class="detail-label">Что нужно</div><div class="detail-text">${esc(v.need)}</div></div>`);
-    if(v.mech) parts.push(`<div class="detail-block"><div class="detail-label">Механика</div><div class="detail-text">${esc(v.mech)}</div></div>`);
-    if(v.how) parts.push(`<div class="detail-block"><div class="detail-label">Как готовится</div><div class="detail-text">${esc(v.how)}</div></div>`);
-    if(v.notes) parts.push(`<div class="detail-block"><div class="detail-label">Заметки</div><div class="detail-text">${esc(v.notes)}</div></div>`);
-
-    details = `<div class="card-details"><div class="card-details-inner">${
-      parts.length ? parts.join('') :
-      '<div class="detail-text" style="text-align:center;color:var(--text-muted)">Детали не заполнены</div>'
-    }</div></div>`;
+  // Собираем содержимое раскрытой части всегда — показ/скрытие через CSS-класс .expanded
+  const parts = [];
+  if((v.ingredients||[]).length){
+    const ingHtml = v.ingredients.map(i=>{
+      const qty = i.qty ? ` — <b>${esc(i.qty)}${i.unit?' '+esc(i.unit):''}</b>` : '';
+      return `• ${esc(i.name)}${qty}`;
+    }).join('<br>');
+    parts.push(`<div class="detail-block">
+      <div class="detail-label">Состав</div>
+      <div class="detail-ing">${ingHtml}</div>
+    </div>`);
   }
+  const serveParts = [];
+  if(v.ice) serveParts.push(esc(v.ice));
+  if(v.temp) serveParts.push(esc(v.temp));
+  if(v.garnish) serveParts.push('Гарнир: ' + esc(v.garnish));
+  if(v.time) serveParts.push('Время: ' + esc(v.time) + ' мин');
+  if(v.difficulty) serveParts.push('Сложность: ' + esc(v.difficulty));
+  if(serveParts.length){
+    parts.push(`<div class="detail-block">
+      <div class="detail-label">Подача</div>
+      <div class="detail-text">${serveParts.join(' · ')}</div>
+    </div>`);
+  }
+  if(v.before || v.after){
+    let yieldText = `${v.before||'—'} → ${v.after||'—'}${v.unit?' '+esc(v.unit):''}`;
+    const ch = calcChange(v.before, v.after);
+    if(ch){
+      const label = ch.diff > 0 ? 'прирост' : (ch.diff < 0 ? 'потери' : 'без изменений');
+      yieldText += ` · ${label} ${ch.sign}${ch.diff.toFixed(0)} (${ch.sign}${ch.pct.toFixed(1)}%)`;
+    }
+    parts.push(`<div class="detail-block">
+      <div class="detail-label">Выход</div>
+      <div class="detail-text">${esc(yieldText)}</div>
+    </div>`);
+  }
+  if(v.cost || v.price){
+    const fc2 = calcFC(v);
+    const items2 = [];
+    if(v.cost) items2.push(`Себестоимость: <b>${esc(v.cost)} ₽</b>`);
+    if(v.price) items2.push(`Цена: <b>${esc(v.price)} ₽</b>`);
+    if(fc2 !== null) items2.push(`FC: <b>${fc2.toFixed(1)}%</b>`);
+    parts.push(`<div class="detail-block">
+      <div class="detail-label">Экономика</div>
+      <div class="detail-econ">${items2.join(' · ')}</div>
+    </div>`);
+  }
+  if(v.need) parts.push(`<div class="detail-block"><div class="detail-label">Что нужно</div><div class="detail-text">${esc(v.need)}</div></div>`);
+  if(v.mech) parts.push(`<div class="detail-block"><div class="detail-label">Механика</div><div class="detail-text">${esc(v.mech)}</div></div>`);
+  if(v.how) parts.push(`<div class="detail-block"><div class="detail-label">Как готовится</div><div class="detail-text">${esc(v.how)}</div></div>`);
+  if(v.notes) parts.push(`<div class="detail-block"><div class="detail-label">Заметки</div><div class="detail-text">${esc(v.notes)}</div></div>`);
+
+  const details = `<div class="card-details"><div class="card-details-inner">${
+    parts.length ? parts.join('') :
+    '<div class="detail-text" style="text-align:center;color:var(--text-muted)">Детали не заполнены</div>'
+  }</div></div>`;
 
   return `
     <div class="card ${isSelected?'selected':''} ${isExpanded?'expanded':''}"
@@ -443,17 +411,14 @@ function cardClick(ev, id){
 
 function toggleExpand(ev, id){
   ev.stopPropagation();
-  if(expandedIds.has(id)) expandedIds.delete(id);
-  else expandedIds.add(id);
-  const it = items.find(i=>i.id===id);
-  if(!it) return;
   const card = document.querySelector(`.card[data-id="${id}"]`);
   if(!card) return;
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = cardHTML(it).trim();
-  const newCard = wrapper.firstElementChild;
-  if(newCard) card.replaceWith(newCard);
-  else render();
+  const willExpand = !card.classList.contains('expanded');
+  card.classList.toggle('expanded', willExpand);
+  if(willExpand) expandedIds.add(id);
+  else expandedIds.delete(id);
+  const btnSpan = card.querySelector('.card-expand-btn span');
+  if(btnSpan) btnSpan.textContent = willExpand ? 'Свернуть' : 'Развернуть';
 }
 
 function toggleCardSelect(ev, id){

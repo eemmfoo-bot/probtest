@@ -611,6 +611,7 @@ function openEditor(id){
   document.getElementById('dupBtn').style.display = it ? 'grid' : 'none';
   document.getElementById('copyFromBtn').style.display = it ? 'grid' : 'none';
   document.getElementById('historyBtn').style.display = (it && it.versions.length > 1) ? 'grid' : 'none';
+  document.getElementById('printBtn').style.display = it ? 'grid' : 'none';
   document.getElementById('shareBtn').style.display = it ? 'grid' : 'none';
 
   if(it){
@@ -1009,6 +1010,7 @@ function openEditorFromDraft(d){
   document.getElementById('dupBtn').style.display = d.editingId ? 'grid' : 'none';
   document.getElementById('copyFromBtn').style.display = d.editingId ? 'grid' : 'none';
   document.getElementById('historyBtn').style.display = (d.editingId && it.versions.length > 1) ? 'grid' : 'none';
+  document.getElementById('printBtn').style.display = d.editingId ? 'grid' : 'none';
   document.getElementById('shareBtn').style.display = d.editingId ? 'grid' : 'none';
   document.getElementById('f-title').value = it.title || '';
   document.getElementById('f-cat').value = it.cat || '';
@@ -1091,6 +1093,18 @@ function duplicateCurrent(){
   toast('Дубликат создан');
 }
 
+/* ====== ПЕЧАТЬ ====== */
+function printCurrent(){
+  if(!editingId) return;
+  saveCurrentVersionToMemory();
+  const it = items.find(i=>i.id === editingId);
+  if(!it) return;
+  const n = it.versions[currentVersionIdx].n;
+  const url = 'print.html?id=' + encodeURIComponent(it.id) + '&v=' + n + '&print=1';
+  window.open(url, '_blank');
+}
+
+/* ====== ИСТОРИЯ ====== */
 function openHistory(){
   if(!editingId) return;
   const it = items.find(i=>i.id === editingId);
@@ -1199,6 +1213,7 @@ function renderHistoryDiff(){
   body.innerHTML = parts.length ? parts.join('') : '<div class="diff-empty">Версии идентичны по содержимому</div>';
 }
 
+/* ====== КОПИРОВАНИЕ СОСТАВА ====== */
 function openCopyFrom(){
   if(!editingId) return;
   copyFromTargetId = null;
@@ -1250,6 +1265,7 @@ function pickCopyFrom(id){
   toast('Состав скопирован');
 }
 
+/* ====== SHARE ====== */
 function openShare(){
   if(!editingId) return;
   saveCurrentVersionToMemory();
@@ -1601,7 +1617,6 @@ loadLocal();
 render();
 checkDraft();
 
-// Подсветка последней открытой карточки
 (function(){
   try{
     const lastId = localStorage.getItem(LS_LAST);

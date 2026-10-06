@@ -160,7 +160,6 @@ h1{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
 .detail-econ{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--text-secondary)}
 .detail-econ b{color:var(--accent);font-weight:600}
 
-/* FAB */
 .fab{position:fixed;right:20px;bottom:calc(20px + var(--safe-bottom));
   width:56px;height:56px;border-radius:50%;border:none;
   background:var(--accent);color:var(--bg-primary);font-size:24px;cursor:pointer;
@@ -173,7 +172,6 @@ h1{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
   .top .btn.primary.hide-mobile{display:none}
 }
 
-/* Selection bar */
 .selection-bar{position:fixed;bottom:calc(20px + var(--safe-bottom));left:50%;
   transform:translateX(-50%) translateY(200px);background:var(--bg-secondary);
   border:1px solid var(--border-hover);border-radius:14px;padding:10px 14px;
@@ -196,7 +194,6 @@ h1{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
 .status-picker-item:hover{background:var(--bg-card)}
 .status-picker-item .dot-s{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 
-/* Modal */
 .overlay{position:fixed;inset:0;background:rgba(3,12,17,.75);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   display:none;align-items:flex-start;justify-content:center;
@@ -216,16 +213,47 @@ h1{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
 .modal-head h2{font-size:17px;font-weight:600;letter-spacing:-.01em;
   display:flex;align-items:center;gap:10px;min-width:0}
 .modal-body{padding:24px}
-.modal-foot{padding:10px 16px;border-top:1px solid var(--border);
+
+.modal-foot{
+  padding:10px 14px;
+  border-top:1px solid var(--border);
   display:flex;justify-content:space-between;align-items:center;gap:8px;
-  position:sticky;bottom:0;background:var(--bg-secondary);
-  border-radius:0 0 16px 16px;flex-wrap:wrap}
-.modal-foot .btn{padding:7px 12px;font-size:13px;border-radius:8px;gap:6px}
-.modal-foot .btn.primary{padding:7px 14px}
-.modal-foot .btn.danger{padding:7px 10px;font-size:12.5px}
-.modal-foot .btn svg{width:14px;height:14px}
-.modal-foot .right{display:flex;gap:6px}
-.modal-foot .left{display:flex;gap:6px;flex-wrap:wrap}
+  position:sticky;bottom:0;
+  background:var(--bg-secondary);
+  border-radius:0 0 16px 16px;
+  z-index:10;
+  box-shadow:0 -10px 24px rgba(3,12,17,.55);
+  flex-wrap:nowrap;
+}
+.modal-foot .left,
+.modal-foot .right{
+  display:flex;gap:4px;align-items:center;flex-wrap:nowrap;
+}
+.modal-foot .right{gap:6px}
+.modal-foot .icon-btn{
+  width:36px;height:36px;padding:0;border-radius:9px;
+  background:transparent;border:1px solid transparent;
+  color:var(--text-secondary);cursor:pointer;
+  display:grid;place-items:center;transition:.15s;font-family:inherit;
+}
+.modal-foot .icon-btn:hover{
+  background:var(--bg-card);border-color:var(--border);
+  color:var(--accent);
+}
+.modal-foot .icon-btn:active{transform:scale(.94)}
+.modal-foot .icon-btn.danger{color:var(--text-muted)}
+.modal-foot .icon-btn.danger:hover{
+  color:var(--danger);background:rgba(217,122,122,.1);
+  border-color:rgba(217,122,122,.25);
+}
+.modal-foot .icon-btn svg{width:17px;height:17px;flex-shrink:0}
+.modal-foot .btn.primary{padding:8px 16px;font-size:13.5px}
+.modal-foot .btn.ghost-sm{
+  padding:8px 12px;font-size:13px;
+  color:var(--text-secondary);background:transparent;border-color:transparent;
+  border-radius:9px;cursor:pointer;font-family:inherit;transition:.15s;
+}
+.modal-foot .btn.ghost-sm:hover{color:var(--text-primary);background:var(--bg-card)}
 
 .v-tabs{display:flex;gap:4px;overflow-x:auto;padding:0 0 4px;
   margin-bottom:20px;border-bottom:1px solid var(--border);scrollbar-width:none}
@@ -361,7 +389,6 @@ h1{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
   font-size:11.5px;color:var(--accent)}
 .divider{height:1px;background:var(--border);margin:22px 0}
 
-/* History */
 .history-pickers{display:flex;gap:10px;align-items:center}
 .history-pickers select{flex:1}
 .hist-arrow{color:var(--text-muted);font-size:14px}
@@ -374,7 +401,6 @@ h1{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
   letter-spacing:.05em;color:var(--text-muted);font-weight:600;margin-bottom:4px}
 .diff-empty{text-align:center;padding:32px 16px;color:var(--text-muted);font-size:13px}
 
-/* Copy from */
 .copy-from-list{max-height:50vh;overflow-y:auto}
 .copy-item{padding:12px 14px;border:1px solid var(--border);border-radius:10px;
   margin-bottom:8px;cursor:pointer;transition:.15s;background:var(--bg-card)}
@@ -391,10 +417,13 @@ h1{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
   .ing-row{grid-template-columns:26px 1fr 62px 52px 34px;gap:5px}
   .ing-row input{padding:9px 8px;font-size:15px}
   .modal-body,.modal-head{padding-left:18px;padding-right:18px}
-  .modal-foot{padding:8px 12px;gap:6px}
-  .modal-foot .btn{padding:6px 10px;font-size:12px;border-radius:7px}
-  .modal-foot .btn svg{width:13px;height:13px}
-  .modal-foot .btn.danger{padding:6px 9px;font-size:11.5px}
+  .modal-foot{padding:8px 10px;gap:5px}
+  .modal-foot .left{gap:2px}
+  .modal-foot .right{gap:5px}
+  .modal-foot .icon-btn{width:34px;height:34px}
+  .modal-foot .icon-btn svg{width:16px;height:16px}
+  .modal-foot .btn.primary{padding:7px 13px;font-size:13px}
+  .modal-foot .btn.ghost-sm{padding:7px 9px;font-size:12.5px}
   h1{font-size:17px}
   .brand-mark{width:40px;height:40px}
 }

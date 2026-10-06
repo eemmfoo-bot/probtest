@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -12,6 +12,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script>
+  // Применяем сохранённую тему до отрисовки (без мигания)
+  (function(){
+    try{
+      const t = localStorage.getItem('pm_theme_v1');
+      if(t === 'light') document.documentElement.setAttribute('data-theme','light');
+    }catch(e){}
+  })();
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -32,6 +41,16 @@
       </div>
     </div>
     <div style="display:flex;gap:8px">
+      <button class="btn icon ghost" onclick="toggleTheme()" title="Сменить тему" id="themeBtn">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class="btn icon ghost" onclick="window.open('stats.html','_blank')" title="Статистика">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 21h18M7 17V9M12 17V5M17 17v-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <button class="btn icon ghost" onclick="openSettings()" title="Резервная копия">
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
@@ -65,6 +84,7 @@
   <div class="filters-row" id="status-filters"></div>
   <div class="filters-row" id="cat-filters"></div>
   <div class="filters-row" id="tag-filters"></div>
+  <div class="filters-row" id="difficulty-filters"></div>
 
   <div id="list"></div>
 </div>

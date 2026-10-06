@@ -214,31 +214,31 @@
       </div>
 
       <div class="field">
-  <div class="ing-head">
-    <label>Ингредиенты</label>
-    <div style="display:flex;gap:4px">
-      <button class="btn ghost small" onclick="openParser()" title="Разобрать текст">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M4 7h16M4 12h10M4 17h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        Разобрать
-      </button>
-      <button class="btn ghost small" onclick="addIng()" title="Добавить вручную">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        Добавить
-      </button>
-    </div>
-  </div>
-  <div id="ing-list"></div>
-  <div class="ing-add-float" id="ingAddFloat" onclick="addIng()">
-    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-    </svg>
-    Ещё ингредиент
-  </div>
-</div>
+        <div class="ing-head">
+          <label>Ингредиенты</label>
+          <div style="display:flex;gap:4px">
+            <button class="btn ghost small" onclick="openParser()" title="Разобрать текст">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 7h16M4 12h10M4 17h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Разобрать
+            </button>
+            <button class="btn ghost small" onclick="addIng()" title="Добавить вручную">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Добавить
+            </button>
+          </div>
+        </div>
+        <div id="ing-list"></div>
+        <div class="ing-add-float" id="ingAddFloat" onclick="addIng()">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          Ещё ингредиент
+        </div>
+      </div>
 
       <div class="row-4">
         <div class="field">
@@ -498,10 +498,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
-
-<script src="app.js"></script>
-  <!-- Парсер ингредиентов -->
+<!-- Парсер ингредиентов -->
 <div class="overlay" id="parserOverlay">
   <div class="modal" onclick="event.stopPropagation()" style="max-width:560px">
     <div class="modal-head">
@@ -531,5 +528,9 @@
     </div>
   </div>
 </div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
 </body>
 </html>

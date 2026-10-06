@@ -18,6 +18,7 @@ function genId(){ return 'id_' + Date.now() + '_' + Math.random().toString(36).s
 function emptyVersion(n){
   return {
     n: n, status: 'idea', ingredients: [{name:'',qty:'',unit:''}],
+    dishware: '',
     before:'', after:'', unit:'мл', cost:'', price:'',
     need:'', mech:'', how:'', notes:'',
     updated: Date.now(), created: Date.now()
@@ -25,11 +26,17 @@ function emptyVersion(n){
 }
 
 function migrateItem(it){
-  if(it && it.versions && Array.isArray(it.versions)) return it;
+  if(it && it.versions && Array.isArray(it.versions)){
+    it.versions.forEach(v=>{
+      if(typeof v.dishware === 'undefined') v.dishware = '';
+    });
+    return it;
+  }
   const v1 = {
     n: 1,
     status: it.status || 'idea',
     ingredients: it.ingredients || [],
+    dishware: it.dishware || '',
     before: it.before || '',
     after: it.after || '',
     unit: it.unit || '',
@@ -174,7 +181,7 @@ function render(){
     if(currentCatFilter !== 'all' && it.cat !== currentCatFilter) return false;
     if(!q) return true;
     const hay = [
-      it.title, it.cat, v.need, v.mech, v.how, v.notes,
+      it.title, it.cat, v.dishware, v.need, v.mech, v.how, v.notes,
       ...(v.ingredients||[]).map(x=>x.name)
     ].join(' ').toLowerCase();
     return hay.includes(q);
@@ -214,17 +221,16 @@ function cardHTML(it){
   const v = it.versions[it.currentVersion - 1] || {};
   const ingCount = (v.ingredients||[]).length;
   const hasYield = v.before || v.after;
-  const unit = v.unit || '';
-  const yieldStr = hasYield ? `${v.before||'—'} → ${v.after||'—'} ${unit}`.trim() : '';
+  const yieldStr = hasYield ? `${v.before||'—'} → ${v.after||'—'}`.trim() : '';
   const fc = calcFC(v);
   const fcStr = fc !== null ? fc.toFixed(1) + '%' : '';
   const isSelected = selectedIds.has(it.id);
   const showV = it.versions.length > 1;
 
   const iconTag = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/></svg>`;
+  const iconGlass = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2h8l-1 8v9a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-9L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 2h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const iconFlask = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 3h6M10 3v5.5L5.5 17a2.5 2.5 0 0 0 2.2 3.5h8.6a2.5 2.5 0 0 0 2.2-3.5L14 8.5V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const iconScale = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v18M5 7h14M7 7l-3 6a3 3 0 0 0 6 0L7 7zM17 7l-3 6a3 3 0 0 0 6 0l-3-6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const iconPct = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="7" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="17" cy="17" r="3" stroke="currentColor" stroke-width="1.5"/><path d="m19 5-14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const iconCheck = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12 5 5 9-11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
   return `
@@ -238,9 +244,10 @@ function cardHTML(it){
       </div>
       <div class="card-meta">
         ${it.cat?`<span>${iconTag}${esc(it.cat)}</span>`:''}
+        ${v.dishware?`<span>${iconGlass}${esc(v.dishware)}</span>`:''}
         ${ingCount?`<span>${iconFlask}${ingCount}</span>`:''}
         ${yieldStr?`<span>${iconScale}${esc(yieldStr)}</span>`:''}
-        ${fcStr?`<span class="fc">${iconPct}${fcStr}</span>`:''}
+        ${fcStr?`<span class="fc">FC ${fcStr}</span>`:''}
       </div>
       ${v.need?`<div class="card-note">${esc(v.need)}</div>`:
         v.notes?`<div class="card-note">${esc(v.notes)}</div>`:''}
@@ -384,9 +391,10 @@ function loadVersionIntoForm(it, idx){
   const v = it.versions[idx];
   if(!v) return;
   document.getElementById('f-status').value = v.status || 'idea';
+  document.getElementById('f-dishware').value = v.dishware || '';
   document.getElementById('f-before').value = v.before || '';
   document.getElementById('f-after').value = v.after || '';
-  document.getElementById('f-unit').value = v.unit || '';
+  document.getElementById('f-unit').value = v.unit || 'мл';
   document.getElementById('f-cost').value = v.cost || '';
   document.getElementById('f-price').value = v.price || '';
   document.getElementById('f-need').value = v.need || '';
@@ -407,9 +415,10 @@ function saveCurrentVersionToMemory(){
   if(!v) return;
   const el = id => document.getElementById(id);
   v.status = el('f-status').value;
+  v.dishware = el('f-dishware').value.trim();
   v.before = el('f-before').value.trim();
   v.after = el('f-after').value.trim();
-  v.unit = el('f-unit').value.trim();
+  v.unit = el('f-unit').value;
   v.cost = el('f-cost').value.trim();
   v.price = el('f-price').value.trim();
   v.need = el('f-need').value.trim();
@@ -525,7 +534,7 @@ function saveDraft(){
   const it = getEditingItem();
   if(!it) return;
   it.title = document.getElementById('f-title').value.trim();
-  it.cat = document.getElementById('f-cat').value.trim();
+  it.cat = document.getElementById('f-cat').value;
   const draft = { editingId, item: it, currentVersionIdx, ts: Date.now() };
   try{ localStorage.setItem(LS_DRAFT, JSON.stringify(draft)); }catch(e){}
 }
@@ -594,7 +603,7 @@ function saveCurrent(){
   const it = getEditingItem();
   if(!it) return;
   it.title = title;
-  it.cat = document.getElementById('f-cat').value.trim();
+  it.cat = document.getElementById('f-cat').value;
   it.updated = Date.now();
 
   const isEdit = !!editingId;
@@ -678,6 +687,7 @@ function buildShareText(){
 
   lines.push('Проработка: ' + it.title + (it.versions.length > 1 ? ' (v' + v.n + ')' : ''));
   if(it.cat) lines.push('Категория: ' + it.cat);
+  if(v.dishware) lines.push('Посуда: ' + v.dishware);
   lines.push('Статус: ' + STATUS_LABEL[v.status]);
   lines.push('');
 
@@ -778,6 +788,7 @@ function buildMultiShareText(){
       const v = it.versions[it.currentVersion - 1];
       lines.push('━━━ ' + (idx+1) + '. ' + it.title + ' ━━━');
       if(it.cat) lines.push('Категория: ' + it.cat);
+      if(v.dishware) lines.push('Посуда: ' + v.dishware);
       lines.push('');
       (v.ingredients||[]).forEach(i=>{
         lines.push('• ' + i.name + (i.qty ? ' — ' + i.qty + (i.unit ? ' ' + i.unit : '') : ''));
@@ -804,6 +815,7 @@ function buildMultiShareText(){
       lines.push((idx+1) + '. ' + it.title + (it.versions.length > 1 ? ' (v' + it.currentVersion + ')' : ''));
       lines.push('═══════════════════════');
       if(it.cat) lines.push('Категория: ' + it.cat);
+      if(v.dishware) lines.push('Посуда: ' + v.dishware);
       lines.push('Статус: ' + STATUS_LABEL[v.status]);
       lines.push('');
       lines.push('СОСТАВ:');

@@ -1,5 +1,6 @@
 const LS_DATA = 'pm_data_v2';
 const LS_DRAFT = 'pm_draft_v1';
+const LS_LAST = 'pm_last_opened_v1';
 const STATUS_LABEL = {idea:'Идея', test:'Тестирую', done:'Готово', archive:'Архив'};
 const STATUS_COLOR = {idea:'var(--warn)', test:'var(--info)', done:'var(--ok)', archive:'var(--text-muted)'};
 
@@ -22,6 +23,8 @@ function emptyVersion(n){
   return {
     n: n, status: 'idea', ingredients: [{name:'',qty:'',unit:''}],
     dishware: '', tags: '',
+    ice: '', temp: '', garnish: '',
+    time: '', difficulty: '',
     before:'', after:'', unit:'мл', cost:'', price:'',
     need:'', mech:'', how:'', notes:'',
     updated: Date.now(), created: Date.now()
@@ -33,8 +36,12 @@ function migrateItem(it){
     it.versions.forEach(v=>{
       if(typeof v.dishware === 'undefined') v.dishware = '';
       if(typeof v.tags === 'undefined') v.tags = '';
+      if(typeof v.ice === 'undefined') v.ice = '';
+      if(typeof v.temp === 'undefined') v.temp = '';
+      if(typeof v.garnish === 'undefined') v.garnish = '';
+      if(typeof v.time === 'undefined') v.time = '';
+      if(typeof v.difficulty === 'undefined') v.difficulty = '';
     });
-    if(typeof it.cat === 'undefined') it.cat = '';
     return it;
   }
   const v1 = {
@@ -43,15 +50,11 @@ function migrateItem(it){
     ingredients: it.ingredients || [],
     dishware: it.dishware || '',
     tags: it.tags || '',
-    before: it.before || '',
-    after: it.after || '',
-    unit: it.unit || '',
-    cost: it.cost || '',
-    price: it.price || '',
-    need: it.need || '',
-    mech: it.mech || '',
-    how: it.how || '',
-    notes: it.notes || '',
+    ice: it.ice || '', temp: it.temp || '', garnish: it.garnish || '',
+    time: it.time || '', difficulty: it.difficulty || '',
+    before: it.before || '', after: it.after || '',
+    unit: it.unit || '', cost: it.cost || '', price: it.price || '',
+    need: it.need || '', mech: it.mech || '', how: it.how || '', notes: it.notes || '',
     updated: it.updated || Date.now(),
     created: it.created || Date.now()
   };
@@ -135,11 +138,7 @@ function calcChange(v1, v2){
 function parseTags(str){
   return String(str||'').split(',').map(t=>t.trim()).filter(Boolean);
 }
-function tagsString(arr){
-  return (arr||[]).join(', ');
-}
 
-/* ====== РЕНДЕР ФИЛЬТРОВ ====== */
 function renderStatusFilters(){
   const counts = {all: items.length};
   ['idea','test','done','archive'].forEach(s=>{
@@ -159,10 +158,7 @@ function renderStatusFilters(){
 function renderCatFilters(){
   const used = new Set();
   items.forEach(i=>{ if(i.cat) used.add(i.cat); });
-  if(used.size === 0){
-    document.getElementById('cat-filters').innerHTML = '';
-    return;
-  }
+  if(used.size === 0){ document.getElementById('cat-filters').innerHTML = ''; return; }
   const sorted = Array.from(used).sort();
   document.getElementById('cat-filters').innerHTML =
     `<div class="label-pill">Категории</div>` +
@@ -183,14 +179,9 @@ function renderTagFilters(){
   items.forEach(it=>{
     const v = it.versions[it.currentVersion - 1];
     if(!v) return;
-    parseTags(v.tags).forEach(t=>{
-      used.set(t, (used.get(t) || 0) + 1);
-    });
+    parseTags(v.tags).forEach(t=>{ used.set(t, (used.get(t) || 0) + 1); });
   });
-  if(used.size === 0){
-    document.getElementById('tag-filters').innerHTML = '';
-    return;
-  }
+  if(used.size === 0){ document.getElementById('tag-filters').innerHTML = ''; return; }
   const sorted = Array.from(used.keys()).sort();
   document.getElementById('tag-filters').innerHTML =
     `<div class="label-pill">Теги</div>` +
@@ -207,7 +198,6 @@ function setFilter(f){ currentFilter = f; render(); }
 function setCatFilter(c){ currentCatFilter = c; render(); }
 function setTagFilter(t){ currentTagFilter = t; render(); }
 
-/* ====== РЕНДЕР СПИСКА ====== */
 function render(){
   renderStatusFilters();
   renderCatFilters();
@@ -225,7 +215,8 @@ function render(){
     if(currentTagFilter !== 'all' && !parseTags(v.tags).includes(currentTagFilter)) return false;
     if(!q) return true;
     const hay = [
-      it.title, it.cat, v.dishware, v.tags, v.need, v.mech, v.how, v.notes,
+      it.title, it.cat, v.dishware, v.tags, v.ice, v.temp, v.garnish, v.difficulty,
+      v.need, v.mech, v.how, v.notes,
       ...(v.ingredients||[]).map(x=>x.name)
     ].join(' ').toLowerCase();
     return hay.includes(q);
@@ -280,11 +271,9 @@ function cardHTML(it){
   const iconCheck = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12 5 5 9-11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const iconChev = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-  // Детали раскрытия — только заполненные поля
   let details = '';
   if(isExpanded){
     const parts = [];
-    // Ингредиенты
     if((v.ingredients||[]).length){
       const ingHtml = v.ingredients.map(i=>{
         const qty = i.qty ? ` — <b>${esc(i.qty)}${i.unit?' '+esc(i.unit):''}</b>` : '';
@@ -295,7 +284,18 @@ function cardHTML(it){
         <div class="detail-ing">${ingHtml}</div>
       </div>`);
     }
-    // Выходы
+    const serveParts = [];
+    if(v.ice) serveParts.push(esc(v.ice));
+    if(v.temp) serveParts.push(esc(v.temp));
+    if(v.garnish) serveParts.push('Гарнир: ' + esc(v.garnish));
+    if(v.time) serveParts.push('Время: ' + esc(v.time) + ' мин');
+    if(v.difficulty) serveParts.push('Сложность: ' + esc(v.difficulty));
+    if(serveParts.length){
+      parts.push(`<div class="detail-block">
+        <div class="detail-label">Подача</div>
+        <div class="detail-text">${serveParts.join(' · ')}</div>
+      </div>`);
+    }
     if(v.before || v.after){
       let yieldText = `${v.before||'—'} → ${v.after||'—'}${v.unit?' '+esc(v.unit):''}`;
       const ch = calcChange(v.before, v.after);
@@ -308,7 +308,6 @@ function cardHTML(it){
         <div class="detail-text">${esc(yieldText)}</div>
       </div>`);
     }
-    // Экономика
     if(v.cost || v.price){
       const fc2 = calcFC(v);
       const items2 = [];
@@ -320,41 +319,15 @@ function cardHTML(it){
         <div class="detail-econ">${items2.join(' · ')}</div>
       </div>`);
     }
-    // Что нужно
-    if(v.need){
-      parts.push(`<div class="detail-block">
-        <div class="detail-label">Что нужно</div>
-        <div class="detail-text">${esc(v.need)}</div>
-      </div>`);
-    }
-    // Механика
-    if(v.mech){
-      parts.push(`<div class="detail-block">
-        <div class="detail-label">Механика</div>
-        <div class="detail-text">${esc(v.mech)}</div>
-      </div>`);
-    }
-    // Как готовится
-    if(v.how){
-      parts.push(`<div class="detail-block">
-        <div class="detail-label">Как готовится</div>
-        <div class="detail-text">${esc(v.how)}</div>
-      </div>`);
-    }
-    // Заметки
-    if(v.notes){
-      parts.push(`<div class="detail-block">
-        <div class="detail-label">Заметки</div>
-        <div class="detail-text">${esc(v.notes)}</div>
-      </div>`);
-    }
-    if(parts.length){
-      details = `<div class="card-details"><div class="card-details-inner">${parts.join('')}</div></div>`;
-    } else {
-      details = `<div class="card-details"><div class="card-details-inner">
-        <div class="detail-text" style="text-align:center;color:var(--text-muted)">Детали не заполнены</div>
-      </div></div>`;
-    }
+    if(v.need) parts.push(`<div class="detail-block"><div class="detail-label">Что нужно</div><div class="detail-text">${esc(v.need)}</div></div>`);
+    if(v.mech) parts.push(`<div class="detail-block"><div class="detail-label">Механика</div><div class="detail-text">${esc(v.mech)}</div></div>`);
+    if(v.how) parts.push(`<div class="detail-block"><div class="detail-label">Как готовится</div><div class="detail-text">${esc(v.how)}</div></div>`);
+    if(v.notes) parts.push(`<div class="detail-block"><div class="detail-label">Заметки</div><div class="detail-text">${esc(v.notes)}</div></div>`);
+
+    details = `<div class="card-details"><div class="card-details-inner">${
+      parts.length ? parts.join('') :
+      '<div class="detail-text" style="text-align:center;color:var(--text-muted)">Детали не заполнены</div>'
+    }</div></div>`;
   }
 
   return `
@@ -404,14 +377,15 @@ function toggleExpand(ev, id){
   ev.stopPropagation();
   if(expandedIds.has(id)) expandedIds.delete(id);
   else expandedIds.add(id);
-  // Перерисовываем только эту карточку
-  const card = document.querySelector(`.card[data-id="${id}"]`);
-  if(!card) return;
   const it = items.find(i=>i.id===id);
   if(!it) return;
-  const temp = document.createElement('div');
-  temp.innerHTML = cardHTML(it);
-  card.replaceWith(temp.firstElementChild);
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if(!card) return;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = cardHTML(it).trim();
+  const newCard = wrapper.firstElementChild;
+  if(newCard) card.replaceWith(newCard);
+  else render();
 }
 
 function toggleCardSelect(ev, id){
@@ -449,7 +423,7 @@ document.addEventListener('click', e=>{
   if(!e.target.closest('.status-picker-wrap')) closeStatusPicker();
 });
 
-async function bulkSetStatus(status){
+function bulkSetStatus(status){
   if(!selectedIds.size) return;
   const n = selectedIds.size;
   if(!confirm(`Перевести ${n} ${plural(n,'проработку','проработки','проработок')} в статус «${STATUS_LABEL[status]}»?`)) return;
@@ -465,7 +439,6 @@ async function bulkSetStatus(status){
   toast(`Обновлено: ${n}`);
 }
 
-/* ====== POPOVER СТАТУСА ====== */
 function openStatusPopover(ev, id){
   ev.stopPropagation();
   const pop = document.getElementById('statusPopover');
@@ -518,12 +491,16 @@ function openEditor(id){
   const it = id ? items.find(i=>i.id===id) : null;
   window._tempNewItem = null;
 
+  if(id){
+    try{ localStorage.setItem(LS_LAST, id); }catch(e){}
+  }
+
   document.getElementById('modalTitle').textContent = it ? 'Редактировать' : 'Новая проработка';
-  document.getElementById('deleteBtn').style.display = it ? 'inline-flex' : 'none';
-  document.getElementById('dupBtn').style.display = it ? 'inline-flex' : 'none';
-  document.getElementById('copyFromBtn').style.display = it ? 'inline-flex' : 'none';
-  document.getElementById('historyBtn').style.display = (it && it.versions.length > 1) ? 'inline-flex' : 'none';
-  document.getElementById('shareBtn').style.display = it ? 'inline-flex' : 'none';
+  document.getElementById('deleteBtn').style.display = it ? 'grid' : 'none';
+  document.getElementById('dupBtn').style.display = it ? 'grid' : 'none';
+  document.getElementById('copyFromBtn').style.display = it ? 'grid' : 'none';
+  document.getElementById('historyBtn').style.display = (it && it.versions.length > 1) ? 'grid' : 'none';
+  document.getElementById('shareBtn').style.display = it ? 'grid' : 'none';
 
   if(it){
     document.getElementById('f-title').value = it.title || '';
@@ -558,7 +535,7 @@ function renderVersionTabs(it){
     </div>
   `;
   const histBtn = document.getElementById('historyBtn');
-  histBtn.style.display = (editingId && it.versions.length > 1) ? 'inline-flex' : 'none';
+  if(histBtn) histBtn.style.display = (editingId && it.versions.length > 1) ? 'grid' : 'none';
 }
 
 function switchVersion(idx){
@@ -579,19 +556,25 @@ function getEditingItem(){
 function loadVersionIntoForm(it, idx){
   const v = it.versions[idx];
   if(!v) return;
-  document.getElementById('f-status').value = v.status || 'idea';
-  document.getElementById('f-dishware').value = v.dishware || '';
-  document.getElementById('f-tags').value = v.tags || '';
-  document.getElementById('f-before').value = v.before || '';
-  document.getElementById('f-after').value = v.after || '';
-  document.getElementById('f-unit').value = v.unit || 'мл';
-  document.getElementById('f-cost').value = v.cost || '';
-  document.getElementById('f-price').value = v.price || '';
-  document.getElementById('f-need').value = v.need || '';
-  document.getElementById('f-mech').value = v.mech || '';
-  document.getElementById('f-how').value = v.how || '';
-  document.getElementById('f-notes').value = v.notes || '';
-  document.getElementById('ing-list').innerHTML = '';
+  const el = id => document.getElementById(id);
+  el('f-status').value = v.status || 'idea';
+  el('f-ice').value = v.ice || '';
+  el('f-temp').value = v.temp || '';
+  el('f-garnish').value = v.garnish || '';
+  el('f-time').value = v.time || '';
+  el('f-difficulty').value = v.difficulty || '';
+  el('f-dishware').value = v.dishware || '';
+  el('f-tags').value = v.tags || '';
+  el('f-before').value = v.before || '';
+  el('f-after').value = v.after || '';
+  el('f-unit').value = v.unit || 'мл';
+  el('f-cost').value = v.cost || '';
+  el('f-price').value = v.price || '';
+  el('f-need').value = v.need || '';
+  el('f-mech').value = v.mech || '';
+  el('f-how').value = v.how || '';
+  el('f-notes').value = v.notes || '';
+  el('ing-list').innerHTML = '';
   const ings = v.ingredients?.length ? v.ingredients : [{name:'',qty:'',unit:''}];
   ings.forEach(addIng.bind(null));
   updateLoss();
@@ -605,6 +588,11 @@ function saveCurrentVersionToMemory(){
   if(!v) return;
   const el = id => document.getElementById(id);
   v.status = el('f-status').value;
+  v.ice = el('f-ice').value;
+  v.temp = el('f-temp').value;
+  v.garnish = el('f-garnish').value.trim();
+  v.time = el('f-time').value.trim();
+  v.difficulty = el('f-difficulty').value;
   v.dishware = el('f-dishware').value.trim();
   v.tags = el('f-tags').value.trim();
   v.before = el('f-before').value.trim();
@@ -645,7 +633,6 @@ function closeEditor(){
   window._tempNewItem = null;
 }
 
-/* ====== ИНГРЕДИЕНТЫ ====== */
 function addIng(data){
   data = data || {name:'',qty:'',unit:''};
   const wrap = document.createElement('div');
@@ -682,17 +669,13 @@ function collectIngredients(){
   return out;
 }
 
-/* Drag-n-drop порядка ингредиентов */
 let dragSrcEl = null;
 
 function attachIngDragEvents(el){
   const handle = el.querySelector('.ing-drag');
   if(!handle) return;
 
-  // Desktop drag
-  handle.addEventListener('mousedown', ()=>{
-    el.draggable = true;
-  });
+  handle.addEventListener('mousedown', ()=>{ el.draggable = true; });
   el.addEventListener('dragstart', e=>{
     dragSrcEl = el;
     el.classList.add('dragging');
@@ -710,9 +693,7 @@ function attachIngDragEvents(el){
     if(!dragSrcEl || dragSrcEl === el) return;
     el.classList.add('drag-over');
   });
-  el.addEventListener('dragleave', ()=>{
-    el.classList.remove('drag-over');
-  });
+  el.addEventListener('dragleave', ()=>{ el.classList.remove('drag-over'); });
   el.addEventListener('drop', e=>{
     e.preventDefault();
     el.classList.remove('drag-over');
@@ -721,19 +702,14 @@ function attachIngDragEvents(el){
     const children = Array.from(parent.children);
     const srcIdx = children.indexOf(dragSrcEl);
     const dstIdx = children.indexOf(el);
-    if(srcIdx < dstIdx){
-      parent.insertBefore(dragSrcEl, el.nextSibling);
-    } else {
-      parent.insertBefore(dragSrcEl, el);
-    }
-    // после перемещения — сохранить порядок в памяти (на случай автосохранения)
+    if(srcIdx < dstIdx) parent.insertBefore(dragSrcEl, el.nextSibling);
+    else parent.insertBefore(dragSrcEl, el);
     scheduleDraft();
   });
 
-  // Touch — простое решение через длинное нажатие и перемещение над элементами
   let touchTimer = null;
   let touchActive = false;
-  handle.addEventListener('touchstart', e=>{
+  handle.addEventListener('touchstart', ()=>{
     touchTimer = setTimeout(()=>{
       touchActive = true;
       el.classList.add('dragging');
@@ -747,9 +723,7 @@ function attachIngDragEvents(el){
     const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
     const targetRow = elBelow?.closest?.('.ing-row');
     document.querySelectorAll('.ing-row.drag-over').forEach(r=>r.classList.remove('drag-over'));
-    if(targetRow && targetRow !== el){
-      targetRow.classList.add('drag-over');
-    }
+    if(targetRow && targetRow !== el) targetRow.classList.add('drag-over');
   }, {passive:false});
   handle.addEventListener('touchend', e=>{
     clearTimeout(touchTimer);
@@ -765,11 +739,8 @@ function attachIngDragEvents(el){
       const children = Array.from(parent.children);
       const srcIdx = children.indexOf(el);
       const dstIdx = children.indexOf(targetRow);
-      if(srcIdx < dstIdx){
-        parent.insertBefore(el, targetRow.nextSibling);
-      } else {
-        parent.insertBefore(el, targetRow);
-      }
+      if(srcIdx < dstIdx) parent.insertBefore(el, targetRow.nextSibling);
+      else parent.insertBefore(el, targetRow);
       scheduleDraft();
     }
   });
@@ -781,37 +752,28 @@ function attachIngDragEvents(el){
   });
 }
 
-/* ====== Enter → следующее поле + автоскролл ====== */
 document.addEventListener('keydown', e=>{
   if(e.key !== 'Enter') return;
   const overlay = document.getElementById('overlay');
   if(!overlay.classList.contains('open')) return;
   const target = e.target;
   if(!target || target.tagName === 'TEXTAREA') return;
-  if(target.id === 'f-need' || target.id === 'f-mech' || target.id === 'f-how' || target.id === 'f-notes') return;
 
   e.preventDefault();
   const modal = overlay.querySelector('.modal');
   if(!modal) return;
 
-  // Собираем все «переходимые» поля в порядке DOM
   const fields = Array.from(modal.querySelectorAll('input:not([readonly]):not([type=file]), select, textarea'))
     .filter(el => el.offsetParent !== null && !el.disabled);
 
   const idx = fields.indexOf(target);
   if(idx === -1) return;
 
-  // Особый случай: в ингредиентах на последнем input жмём Enter — добавляем новый ряд
   if(target.dataset.k === 'unit'){
     const row = target.closest('.ing-row');
-    const rowInputs = Array.from(row.querySelectorAll('input'));
-    const isLast = rowInputs[rowInputs.length - 1] === target;
-    // в нашей строке единица — не последний input (после неё кнопка), поэтому просто переходим к следующему ингредиенту
     const nextRow = row.nextElementSibling;
     if(!nextRow || !nextRow.classList.contains('ing-row')){
-      // последний ряд — добавляем новый
       addIng();
-      // и переходим в первое поле нового ряда
       const rows = document.querySelectorAll('#ing-list .ing-row');
       const newRow = rows[rows.length - 1];
       const newInput = newRow.querySelector('input');
@@ -832,14 +794,10 @@ document.addEventListener('keydown', e=>{
 });
 
 function scrollToField(el){
-  try{
-    el.scrollIntoView({behavior:'smooth', block:'center'});
-  }catch(e){
-    el.scrollIntoView(false);
-  }
+  try{ el.scrollIntoView({behavior:'smooth', block:'center'}); }
+  catch(e){ el.scrollIntoView(false); }
 }
 
-/* ====== Выходы и FC ====== */
 function updateLoss(){
   const v1 = parseFloat(document.getElementById('f-before').value);
   const v2 = parseFloat(document.getElementById('f-after').value);
@@ -881,7 +839,6 @@ document.addEventListener('change', e=>{
   if(document.getElementById('overlay').classList.contains('open')) scheduleDraft();
 });
 
-/* ====== ЧЕРНОВИК ====== */
 function scheduleDraft(){
   clearTimeout(draftTimer);
   setStatus(true);
@@ -937,11 +894,11 @@ function restoreDraft(){
 function openEditorFromDraft(d){
   const it = d.item;
   document.getElementById('modalTitle').textContent = d.editingId ? 'Редактировать' : 'Новая проработка';
-  document.getElementById('deleteBtn').style.display = d.editingId ? 'inline-flex' : 'none';
-  document.getElementById('dupBtn').style.display = d.editingId ? 'inline-flex' : 'none';
-  document.getElementById('copyFromBtn').style.display = d.editingId ? 'inline-flex' : 'none';
-  document.getElementById('historyBtn').style.display = (d.editingId && it.versions.length > 1) ? 'inline-flex' : 'none';
-  document.getElementById('shareBtn').style.display = d.editingId ? 'inline-flex' : 'none';
+  document.getElementById('deleteBtn').style.display = d.editingId ? 'grid' : 'none';
+  document.getElementById('dupBtn').style.display = d.editingId ? 'grid' : 'none';
+  document.getElementById('copyFromBtn').style.display = d.editingId ? 'grid' : 'none';
+  document.getElementById('historyBtn').style.display = (d.editingId && it.versions.length > 1) ? 'grid' : 'none';
+  document.getElementById('shareBtn').style.display = d.editingId ? 'grid' : 'none';
   document.getElementById('f-title').value = it.title || '';
   document.getElementById('f-cat').value = it.cat || '';
   renderVersionTabs(it);
@@ -957,7 +914,6 @@ function discardDraft(){
   window._draft = null;
 }
 
-/* ====== СОХРАНЕНИЕ / УДАЛЕНИЕ / ДУБЛЬ ====== */
 function saveCurrent(){
   const title = document.getElementById('f-title').value.trim();
   if(!title){
@@ -1024,7 +980,6 @@ function duplicateCurrent(){
   toast('Дубликат создан');
 }
 
-/* ====== ИСТОРИЯ ВЕРСИЙ ====== */
 function openHistory(){
   if(!editingId) return;
   const it = items.find(i=>i.id === editingId);
@@ -1055,37 +1010,19 @@ function renderHistoryDiff(){
   const vA = it.versions.find(x=>x.n===fromN);
   const vB = it.versions.find(x=>x.n===toN);
   const body = document.getElementById('hist-body');
-  if(!vA || !vB){
-    body.innerHTML = '<div class="diff-empty">Выбери две версии</div>';
-    return;
-  }
-  if(vA.n === vB.n){
-    body.innerHTML = '<div class="diff-empty">Это одна и та же версия</div>';
-    return;
-  }
+  if(!vA || !vB){ body.innerHTML = '<div class="diff-empty">Выбери две версии</div>'; return; }
+  if(vA.n === vB.n){ body.innerHTML = '<div class="diff-empty">Это одна и та же версия</div>'; return; }
 
   const parts = [];
 
-  // Статус
   if(vA.status !== vB.status){
-    parts.push(`<div class="diff-item chg">
-      <div class="diff-label">Статус</div>
-      ${esc(STATUS_LABEL[vA.status])} → ${esc(STATUS_LABEL[vB.status])}
-    </div>`);
+    parts.push(`<div class="diff-item chg"><div class="diff-label">Статус</div>${esc(STATUS_LABEL[vA.status])} → ${esc(STATUS_LABEL[vB.status])}</div>`);
   }
-
-  // Посуда
   if((vA.dishware||'') !== (vB.dishware||'')){
-    if(!vA.dishware && vB.dishware){
-      parts.push(`<div class="diff-item add"><div class="diff-label">Посуда</div>+ ${esc(vB.dishware)}</div>`);
-    } else if(vA.dishware && !vB.dishware){
-      parts.push(`<div class="diff-item del"><div class="diff-label">Посуда</div>− ${esc(vA.dishware)}</div>`);
-    } else {
-      parts.push(`<div class="diff-item chg"><div class="diff-label">Посуда</div>${esc(vA.dishware)} → ${esc(vB.dishware)}</div>`);
-    }
+    if(!vA.dishware && vB.dishware) parts.push(`<div class="diff-item add"><div class="diff-label">Посуда</div>+ ${esc(vB.dishware)}</div>`);
+    else if(vA.dishware && !vB.dishware) parts.push(`<div class="diff-item del"><div class="diff-label">Посуда</div>− ${esc(vA.dishware)}</div>`);
+    else parts.push(`<div class="diff-item chg"><div class="diff-label">Посуда</div>${esc(vA.dishware)} → ${esc(vB.dishware)}</div>`);
   }
-
-  // Теги
   const tagsA = parseTags(vA.tags);
   const tagsB = parseTags(vB.tags);
   const tagsAdded = tagsB.filter(t=>!tagsA.includes(t));
@@ -1097,7 +1034,6 @@ function renderHistoryDiff(){
     parts.push(`<div class="diff-item chg"><div class="diff-label">Теги</div>${html}</div>`);
   }
 
-  // Ингредиенты
   const ingA = vA.ingredients || [];
   const ingB = vB.ingredients || [];
   const keyOf = i => (i.name||'').toLowerCase() + '|' + (i.qty||'') + '|' + (i.unit||'');
@@ -1124,48 +1060,34 @@ function renderHistoryDiff(){
     }
   });
 
-  // Выходы
-  if((vA.before||'') !== (vB.before||'')){
-    parts.push(`<div class="diff-item chg"><div class="diff-label">Выход 1</div>${esc(vA.before||'—')} → ${esc(vB.before||'—')}</div>`);
-  }
-  if((vA.after||'') !== (vB.after||'')){
-    parts.push(`<div class="diff-item chg"><div class="diff-label">Выход 2</div>${esc(vA.after||'—')} → ${esc(vB.after||'—')}</div>`);
-  }
-  if((vA.unit||'') !== (vB.unit||'')){
-    parts.push(`<div class="diff-item chg"><div class="diff-label">Единица</div>${esc(vA.unit||'—')} → ${esc(vB.unit||'—')}</div>`);
-  }
+  if((vA.before||'') !== (vB.before||'')) parts.push(`<div class="diff-item chg"><div class="diff-label">Выход 1</div>${esc(vA.before||'—')} → ${esc(vB.before||'—')}</div>`);
+  if((vA.after||'') !== (vB.after||'')) parts.push(`<div class="diff-item chg"><div class="diff-label">Выход 2</div>${esc(vA.after||'—')} → ${esc(vB.after||'—')}</div>`);
+  if((vA.unit||'') !== (vB.unit||'')) parts.push(`<div class="diff-item chg"><div class="diff-label">Единица</div>${esc(vA.unit||'—')} → ${esc(vB.unit||'—')}</div>`);
+  if((vA.cost||'') !== (vB.cost||'')) parts.push(`<div class="diff-item chg"><div class="diff-label">Себестоимость</div>${esc(vA.cost||'—')} → ${esc(vB.cost||'—')}</div>`);
+  if((vA.price||'') !== (vB.price||'')) parts.push(`<div class="diff-item chg"><div class="diff-label">Цена порции</div>${esc(vA.price||'—')} → ${esc(vB.price||'—')}</div>`);
 
-  // Экономика
-  if((vA.cost||'') !== (vB.cost||'')){
-    parts.push(`<div class="diff-item chg"><div class="diff-label">Себестоимость</div>${esc(vA.cost||'—')} → ${esc(vB.cost||'—')}</div>`);
-  }
-  if((vA.price||'') !== (vB.price||'')){
-    parts.push(`<div class="diff-item chg"><div class="diff-label">Цена порции</div>${esc(vA.price||'—')} → ${esc(vB.price||'—')}</div>`);
-  }
+  [['ice','Подача'],['temp','Температура'],['garnish','Гарнир'],['time','Время'],['difficulty','Сложность']].forEach(([k, label])=>{
+    const a = (vA[k]||'').trim();
+    const b = (vB[k]||'').trim();
+    if(a === b) return;
+    parts.push(`<div class="diff-item chg"><div class="diff-label">${label}</div>${esc(a||'—')} → ${esc(b||'—')}</div>`);
+  });
 
-  // Текстовые поля
   [['need','Что нужно'],['mech','Механика'],['how','Как готовится'],['notes','Заметки']].forEach(([k, label])=>{
     const a = (vA[k]||'').trim();
     const b = (vB[k]||'').trim();
     if(a === b) return;
-    if(!a && b){
-      parts.push(`<div class="diff-item add"><div class="diff-label">${label} — добавлено</div>${esc(b)}</div>`);
-    } else if(a && !b){
-      parts.push(`<div class="diff-item del"><div class="diff-label">${label} — удалено</div>${esc(a)}</div>`);
-    } else {
-      parts.push(`<div class="diff-item chg"><div class="diff-label">${label}</div>
+    if(!a && b) parts.push(`<div class="diff-item add"><div class="diff-label">${label} — добавлено</div>${esc(b)}</div>`);
+    else if(a && !b) parts.push(`<div class="diff-item del"><div class="diff-label">${label} — удалено</div>${esc(a)}</div>`);
+    else parts.push(`<div class="diff-item chg"><div class="diff-label">${label}</div>
         <div style="color:var(--danger);text-decoration:line-through;opacity:.7">${esc(a)}</div>
         <div style="color:var(--ok);margin-top:4px">${esc(b)}</div>
       </div>`);
-    }
   });
 
-  body.innerHTML = parts.length
-    ? parts.join('')
-    : '<div class="diff-empty">Версии идентичны по содержимому</div>';
+  body.innerHTML = parts.length ? parts.join('') : '<div class="diff-empty">Версии идентичны по содержимому</div>';
 }
 
-/* ====== КОПИРОВАНИЕ СОСТАВА ИЗ ДРУГОЙ ПРОРАБОТКИ ====== */
 function openCopyFrom(){
   if(!editingId) return;
   copyFromTargetId = null;
@@ -1208,18 +1130,15 @@ function pickCopyFrom(id){
   if(!src) return;
   const srcV = src.versions[src.currentVersion - 1];
   if(!confirm(`Заменить состав текущей версии составом из «${src.title}»?`)) return;
-  // перезаписываем ингредиенты в текущей форме
   document.getElementById('ing-list').innerHTML = '';
   const ings = (srcV.ingredients && srcV.ingredients.length) ? srcV.ingredients : [{name:'',qty:'',unit:''}];
   ings.forEach(addIng.bind(null));
-  // единицу тоже подтянем, если она есть
   if(srcV.unit) document.getElementById('f-unit').value = srcV.unit;
   scheduleDraft();
   closeCopyFrom();
   toast('Состав скопирован');
 }
 
-/* ====== SHARE ====== */
 function openShare(){
   if(!editingId) return;
   saveCurrentVersionToMemory();
@@ -1258,6 +1177,13 @@ function buildShareText(){
   const yieldLine = (v.before || v.after)
     ? `${v.before||'—'} → ${v.after||'—'} ${v.unit||''}`.trim() : '';
 
+  const serveLine = [];
+  if(v.ice) serveLine.push(v.ice);
+  if(v.temp) serveLine.push(v.temp);
+  if(v.garnish) serveLine.push('Гарнир: ' + v.garnish);
+  if(v.time) serveLine.push('Время: ' + v.time + ' мин');
+  if(v.difficulty) serveLine.push('Сложность: ' + v.difficulty);
+
   if(preset === 'short'){
     lines.push('Состав:');
     (v.ingredients||[]).forEach(i=>{
@@ -1284,6 +1210,11 @@ function buildShareText(){
       }
       lines.push('');
     }
+    if(serveLine.length){
+      lines.push('ПОДАЧА:');
+      serveLine.forEach(l=>lines.push('• ' + l));
+      lines.push('');
+    }
     if(v.cost || v.price){
       lines.push('ЭКОНОМИКА:');
       if(v.cost) lines.push('• Себестоимость: ' + v.cost + ' ₽');
@@ -1299,6 +1230,11 @@ function buildShareText(){
 
   if(preset === 'tech'){
     if(yieldLine){ lines.push('ВЫХОД: ' + yieldLine); lines.push(''); }
+    if(serveLine.length){
+      lines.push('ПОДАЧА:');
+      serveLine.forEach(l=>lines.push('• ' + l));
+      lines.push('');
+    }
     if(v.mech){ lines.push('МЕХАНИКА РЕАЛИЗАЦИИ:'); lines.push(v.mech); lines.push(''); }
     if(v.how){ lines.push('КАК ГОТОВИТСЯ:'); lines.push(v.how); lines.push(''); }
     if(v.notes){ lines.push('ЗАМЕТКИ:'); lines.push(v.notes); }
@@ -1322,7 +1258,6 @@ async function nativeShare(){
   }
 }
 
-/* ====== SHARE НЕСКОЛЬКИХ ====== */
 function shareSelected(){
   if(!selectedIds.size) return;
   closeStatusPicker();
@@ -1400,6 +1335,17 @@ function buildMultiShareText(){
         }
         lines.push('');
       }
+      const serveLine = [];
+      if(v.ice) serveLine.push(v.ice);
+      if(v.temp) serveLine.push(v.temp);
+      if(v.garnish) serveLine.push('Гарнир: ' + v.garnish);
+      if(v.time) serveLine.push('Время: ' + v.time + ' мин');
+      if(v.difficulty) serveLine.push('Сложность: ' + v.difficulty);
+      if(serveLine.length){
+        lines.push('ПОДАЧА:');
+        serveLine.forEach(l=>lines.push('• ' + l));
+        lines.push('');
+      }
       if(v.cost || v.price){
         if(v.cost) lines.push('Себестоимость: ' + v.cost + ' ₽');
         if(v.price) lines.push('Цена порции: ' + v.price + ' ₽');
@@ -1446,7 +1392,6 @@ async function copyToClipboard(text){
   }
 }
 
-/* ====== BACKUP ====== */
 function downloadBackup(){
   const data = JSON.stringify(items, null, 2);
   const blob = new Blob([data], {type:'application/json'});
@@ -1474,9 +1419,8 @@ function uploadBackup(file){
         'ОК — ЗАМЕНИТЬ текущие данные (' + items.length + ')\n' +
         'Отмена — ДОБАВИТЬ к ним (' + migrated.length + ')'
       );
-      if(replace){
-        items = migrated;
-      } else {
+      if(replace){ items = migrated; }
+      else {
         const ids = new Set(items.map(i=>i.id));
         migrated.forEach(d => { if(!ids.has(d.id)) items.push(d); });
       }
@@ -1490,7 +1434,6 @@ function uploadBackup(file){
   reader.readAsText(file);
 }
 
-/* ====== SETTINGS ====== */
 function openSettings(){
   document.getElementById('s-local-count').textContent = items.length;
   const totalVersions = items.reduce((s, i)=>s + i.versions.length, 0);
@@ -1503,7 +1446,6 @@ function closeSettings(){
   document.body.classList.remove('modal-open');
 }
 
-/* ====== TOAST ====== */
 let toastTimer;
 function toast(msg){
   const t = document.getElementById('toast');
@@ -1513,7 +1455,6 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2000);
 }
 
-/* ====== EVENTS ====== */
 document.getElementById('overlay').addEventListener('click', e=>{
   if(e.target.id === 'overlay') closeEditor();
 });
@@ -1542,7 +1483,25 @@ document.addEventListener('keydown', e=>{
   }
 });
 
-/* ====== INIT ====== */
 loadLocal();
 render();
 checkDraft();
+
+// Подсветка последней открытой карточки
+(function(){
+  try{
+    const lastId = localStorage.getItem(LS_LAST);
+    if(!lastId) return;
+    const exists = items.find(i=>i.id === lastId);
+    if(!exists) return;
+    setTimeout(()=>{
+      const card = document.querySelector(`.card[data-id="${lastId}"]`);
+      if(card){
+        card.scrollIntoView({behavior:'smooth', block:'center'});
+        card.style.transition = 'box-shadow .5s';
+        card.style.boxShadow = '0 0 0 3px var(--accent)';
+        setTimeout(()=>{ card.style.boxShadow = ''; }, 2000);
+      }
+    }, 300);
+  }catch(e){}
+})();

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Печать проработки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:#f5f5f5;color:#000;line-height:1.5;
+    padding:24px 16px;
+  }
+  .page{
+    max-width:800px;margin:0 auto;background:#fff;
+    padding:48px 56px;box-shadow:0 4px 24px rgba(0,0,0,.08);
+    border-radius:4px;
+  }
+  .head{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    gap:20px;padding-bottom:16px;border-bottom:2px solid #000;margin-bottom:24px;
+  }
+  h1{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.2}
+  .sub{font-size:12px;color:#555;margin-top:6px;text-transform:uppercase;
+    letter-spacing:.08em;font-weight:600}
+  .stamp{text-align:right;font-size:11px;color:#666;white-space:nowrap}
+  .stamp b{color:#000;font-weight:600}
+
+  .meta{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:24px;
+    font-size:13px;color:#333}
+  .meta span{display:flex;align-items:center;gap:6px}
+  .meta b{font-weight:600}
+
+  .section{margin-bottom:24px}
+  .section-title{font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.1em;color:#666;padding-bottom:6px;
+    border-bottom:1px solid #ddd;margin-bottom:12px}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  thead tr{background:#f5f5f5}
+  th{
+    text-align:left;padding:8px 12px;font-size:11px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.06em;color:#555;
+    border-bottom:1px solid #ddd;
+  }
+  th:last-child,td:last-child{text-align:right}
+  td{padding:10px 12px;border-bottom:1px solid #eee;vertical-align:top}
+  td.qty{white-space:nowrap;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+
+  .text{font-size:14px;line-height:1.65;color:#222;white-space:pre-wrap}
+  .yields{display:flex;gap:32px;flex-wrap:wrap;font-size:14px}
+  .yields b{font-weight:600}
+  .yields .val{font-variant-numeric:tabular-nums}
+
+  .econ-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .econ-cell{padding:12px 16px;background:#f9f9f9;border-radius:6px;
+    border:1px solid #eee}
+  .econ-cell .label{font-size:10px;font-weight:600;text-transform:uppercase;
+    letter-spacing:.08em;color:#666;margin-bottom:4px}
+  .econ-cell .value{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+
+  .footer{margin-top:40px;padding-top:16px;border-top:1px solid #ddd;
+    display:flex;justify-content:space-between;font-size:10px;
+    color:#888;text-transform:uppercase;letter-spacing:.08em}
+
+  .toolbar{
+    position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:10;
+  }
+  .toolbar button{
+    font-family:inherit;font-size:14px;font-weight:500;
+    padding:10px 16px;border-radius:8px;cursor:pointer;
+    border:1px solid #ccc;background:#fff;color:#000;
+  }
+  .toolbar button.primary{background:#000;color:#fff;border-color:#000}
+  .toolbar button:hover{opacity:.85}
+
+  .empty{
+    text-align:center;padding:60px 20px;color:#888;font-size:14px;
+  }
+
+  @media print{
+    body{background:#fff;padding:0}
+    .page{box-shadow:none;padding:0;max-width:none;border-radius:0}
+    .toolbar{display:none}
+    @page{margin:16mm 14mm}
+  }
+
+  @media (max-width:600px){
+    .page{padding:24px 20px}
+    h1{font-size:20px}
+    .econ-grid{grid-template-columns:1fr}
+    .toolbar{top:8px;right:8px}
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button onclick="window.print()" class="primary">🖨 Распечатать</button>
+  <button onclick="window.close()">Закрыть</button>
+</div>
+
+<div class="page" id="page">
+  <div class="empty">Загрузка...</div>
+</div>
+
+<script>
+const LS_DATA = 'pm_data_v2';
+
+function esc(s){
+  return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtDate(ts){
+  if(!ts) return '';
+  return new Date(ts).toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
+}
+function calcFC(v){
+  const cost = parseFloat(v.cost);
+  const price = parseFloat(v.price);
+  if(isNaN(cost) || isNaN(price) || price <= 0) return null;
+  return (cost / price) * 100;
+}
+function calcChange(a, b){
+  const x = parseFloat(a), y = parseFloat(b);
+  if(isNaN(x) || isNaN(y) || x <= 0) return null;
+  const diff = y - x;
+  const pct = (diff / x) * 100;
+  return { diff, pct };
+}
+
+function getParams(){
+  const url = new URL(window.location.href);
+  return {
+    id: url.searchParams.get('id'),
+    version: url.searchParams.get('v')
+  };
+}
+
+function render(){
+  const page = document.getElementById('page');
+  let items = [];
+  try{ items = JSON.parse(localStorage.getItem(LS_DATA)) || []; }
+  catch(e){ items = []; }
+
+  const { id, version } = getParams();
+  if(!id){
+    page.innerHTML = '<div class="empty">Не указан ID проработки в ссылке</div>';
+    return;
+  }
+  const it = items.find(i=>i.id === id);
+  if(!it){
+    page.innerHTML = '<div class="empty">Проработка не найдена. Возможно, она была удалена.</div>';
+    return;
+  }
+  let v = it.versions[it.currentVersion - 1];
+  if(version){
+    const vn = parseInt(version);
+    const found = it.versions.find(x=>x.n === vn);
+    if(found) v = found;
+  }
+  if(!v){ page.innerHTML = '<div class="empty">Версия не найдена</div>'; return; }
+
+  const tags = String(v.tags||'').split(',').map(t=>t.trim()).filter(Boolean);
+  const ingRows = (v.ingredients||[]).map(i=>`
+    <tr>
+      <td>${esc(i.name)}</td>
+      <td class="qty">${esc(i.qty||'')} ${esc(i.unit||'')}</td>
+    </tr>
+  `).join('');
+
+  const yieldParts = [];
+  if(v.before) yieldParts.push(`<span>Выход 1: <span class="val"><b>${esc(v.before)}</b> ${esc(v.unit||'')}</span></span>`);
+  if(v.after) yieldParts.push(`<span>Выход 2: <span class="val"><b>${esc(v.after)}</b> ${esc(v.unit||'')}</span></span>`);
+  const ch = calcChange(v.before, v.after);
+  if(ch){
+    const label = ch.diff > 0 ? 'Прирост' : 'Потери';
+    const sign = ch.diff > 0 ? '+' : '';
+    yieldParts.push(`<span>${label}: <span class="val"><b>${sign}${ch.diff.toFixed(0)}</b> (${sign}${ch.pct.toFixed(1)}%)</span></span>`);
+  }
+
+  const fc = calcFC(v);
+  const econCells = [];
+  if(v.cost) econCells.push(`<div class="econ-cell"><div class="label">Себестоимость</div><div class="value">${esc(v.cost)} ₽</div></div>`);
+  if(v.price) econCells.push(`<div class="econ-cell"><div class="label">Цена порции</div><div class="value">${esc(v.price)} ₽</div></div>`);
+  if(fc !== null) econCells.push(`<div class="econ-cell"><div class="label">FC</div><div class="value">${fc.toFixed(1)}%</div></div>`);
+
+  const serveParts = [];
+  if(v.ice) serveParts.push(esc(v.ice));
+  if(v.temp) serveParts.push(esc(v.temp));
+  if(v.garnish) serveParts.push('Гарнир: ' + esc(v.garnish));
+  if(v.time) serveParts.push('Время: ' + esc(v.time) + ' мин');
+  if(v.difficulty) serveParts.push('Сложность: ' + esc(v.difficulty));
+
+  const metaParts = [];
+  if(it.cat) metaParts.push(`<span>Категория: <b>${esc(it.cat)}</b></span>`);
+  if(v.dishware) metaParts.push(`<span>Посуда: <b>${esc(v.dishware)}</b></span>`);
+  if(tags.length) metaParts.push(`<span>Теги: <b>${tags.map(t=>'#'+esc(t)).join(' ')}</b></span>`);
+
+  const versionTag = it.versions.length > 1 ? ` · v${v.n}` : '';
+
+  page.innerHTML = `
+    <div class="head">
+      <div>
+        <h1>${esc(it.title)}</h1>
+        <div class="sub">Технологическая карта${versionTag}</div>
+      </div>
+      <div class="stamp">
+        Создано<br><b>${fmtDate(it.created)}</b><br>
+        Обновлено<br><b>${fmtDate(v.updated)}</b>
+      </div>
+    </div>
+
+    ${metaParts.length ? `<div class="meta">${metaParts.join('')}</div>` : ''}
+
+    ${ingRows ? `
+      <div class="section">
+        <div class="section-title">Состав</div>
+        <table>
+          <thead>
+            <tr><th>Ингредиент</th><th>Количество</th></tr>
+          </thead>
+          <tbody>${ingRows}</tbody>
+        </table>
+      </div>
+    ` : ''}
+
+    ${yieldParts.length ? `
+      <div class="section">
+        <div class="section-title">Выход</div>
+        <div class="yields">${yieldParts.join('')}</div>
+      </div>
+    ` : ''}
+
+    ${serveParts.length ? `
+      <div class="section">
+        <div class="section-title">Подача</div>
+        <div class="text">${serveParts.join(' · ')}</div>
+      </div>
+    ` : ''}
+
+    ${econCells.length ? `
+      <div class="section">
+        <div class="section-title">Экономика</div>
+        <div class="econ-grid">${econCells.join('')}</div>
+      </div>
+    ` : ''}
+
+    ${v.need ? `
+      <div class="section">
+        <div class="section-title">Что нужно</div>
+        <div class="text">${esc(v.need)}</div>
+      </div>
+    ` : ''}
+
+    ${v.mech ? `
+      <div class="section">
+        <div class="section-title">Механика реализации</div>
+        <div class="text">${esc(v.mech)}</div>
+      </div>
+    ` : ''}
+
+    ${v.how ? `
+      <div class="section">
+        <div class="section-title">Как готовится</div>
+        <div class="text">${esc(v.how)}</div>
+      </div>
+    ` : ''}
+
+    ${v.notes ? `
+      <div class="section">
+        <div class="section-title">Заметки</div>
+        <div class="text">${esc(v.notes)}</div>
+      </div>
+    ` : ''}
+
+    <div class="footer">
+      <span>Пинта · Проработки</span>
+      <span>${fmtDate(Date.now())}</span>
+    </div>
+  `;
+}
+
+render();
+
+// Автозапуск печати, если в URL есть ?print=1
+try{
+  const url = new URL(window.location.href);
+  if(url.searchParams.get('print') === '1'){
+    setTimeout(()=>{ window.print(); }, 400);
+  }
+}catch(e){}
+</script>
+</body>
+</html>

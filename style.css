@@ -194,38 +194,67 @@ h1{font-size:19px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
 .status-picker-item:hover{background:var(--bg-card)}
 .status-picker-item .dot-s{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 
+/* ========== МОДАЛКА (НОВАЯ АРХИТЕКТУРА) ==========
+   Оверлей — flex-центрирование без скролла.
+   Модалка — flex-колонка с фиксированной высотой.
+   Внутри скроллится только .modal-body.
+   Верхний и нижний бары прижаты к краям модалки. */
+
 .overlay{position:fixed;inset:0;background:rgba(3,12,17,.75);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  display:none;align-items:flex-start;justify-content:center;
+  display:none;align-items:center;justify-content:center;
   padding:calc(16px + var(--safe-top)) 12px calc(16px + var(--safe-bottom));
-  overflow-y:auto;z-index:100;-webkit-overflow-scrolling:touch;
-  overscroll-behavior:contain}
+  z-index:100;overscroll-behavior:contain}
 .overlay.open{display:flex}
-.modal{background-color:var(--bg-secondary);border:1px solid var(--border);
-  border-radius:16px;width:100%;max-width:720px;
-  box-shadow:0 24px 64px rgba(0,0,0,.6);animation:fadeIn .2s;margin:auto 0}
+
+.modal{
+  background-color:var(--bg-secondary);
+  border:1px solid var(--border);
+  border-radius:16px;
+  width:100%;
+  max-width:720px;
+  max-height:100%;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  box-shadow:0 24px 64px rgba(0,0,0,.6);
+  animation:fadeIn .2s;
+}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
-.modal-head{padding:20px 24px;border-bottom:1px solid var(--border);
-  display:flex;justify-content:space-between;align-items:center;
-  position:sticky;top:0;background-color:var(--bg-secondary);
-  z-index:5;border-radius:16px 16px 0 0;gap:12px;
-  isolation:isolate}
+.modal-head{
+  padding:18px 24px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  background-color:var(--bg-secondary);
+  flex-shrink:0;
+  border-radius:16px 16px 0 0;
+}
 .modal-head h2{font-size:17px;font-weight:600;letter-spacing:-.01em;
   display:flex;align-items:center;gap:10px;min-width:0}
-.modal-body{padding:24px}
+
+.modal-body{
+  padding:24px;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;
+  flex:1 1 auto;
+  min-height:0;
+}
 
 .modal-foot{
   padding:10px 14px;
   border-top:1px solid var(--border);
-  display:flex;justify-content:space-between;align-items:center;gap:8px;
-  position:sticky;bottom:0;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
   background-color:var(--bg-secondary);
+  flex-shrink:0;
   border-radius:0 0 16px 16px;
-  z-index:10;
-  box-shadow:0 -10px 24px rgba(3,12,17,.55);
-  flex-wrap:nowrap;
-  isolation:isolate;
 }
 .modal-foot .left,
 .modal-foot .right{

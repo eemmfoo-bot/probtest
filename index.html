@@ -52,7 +52,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
       </svg>
-      <input id="q" placeholder="Поиск по названию, ингредиентам..." oninput="render()">
+      <input id="q" placeholder="Поиск по названию, ингредиентам, тегам..." oninput="render()">
     </div>
     <select class="sort-select" id="sort" onchange="render()">
       <option value="updated">Сначала недавние</option>
@@ -64,6 +64,7 @@
 
   <div class="filters-row" id="status-filters"></div>
   <div class="filters-row" id="cat-filters"></div>
+  <div class="filters-row" id="tag-filters"></div>
 
   <div id="list"></div>
 </div>
@@ -77,6 +78,15 @@
 <div class="selection-bar" id="selectionBar">
   <span class="count">Выбрано: <b id="selCount">0</b></span>
   <button class="btn small" onclick="clearSelection()">Снять</button>
+  <div class="status-picker-wrap">
+    <button class="btn small" onclick="toggleStatusPicker(event)">Статус ▾</button>
+    <div class="status-picker" id="bulkStatusPicker">
+      <div class="status-picker-item" onclick="bulkSetStatus('idea')"><span class="dot-s" style="background:var(--warn)"></span>Идея</div>
+      <div class="status-picker-item" onclick="bulkSetStatus('test')"><span class="dot-s" style="background:var(--info)"></span>В работе</div>
+      <div class="status-picker-item" onclick="bulkSetStatus('done')"><span class="dot-s" style="background:var(--ok)"></span>Готово</div>
+      <div class="status-picker-item" onclick="bulkSetStatus('archive')"><span class="dot-s" style="background:var(--text-muted)"></span>Архив</div>
+    </div>
+  </div>
   <button class="btn small primary" onclick="shareSelected()">
     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -156,6 +166,12 @@
       </div>
 
       <div class="field">
+        <label>Теги</label>
+        <input id="f-tags" placeholder="цитрус, зимний, авторский (через запятую)">
+        <div class="hint">Разделяй запятой. Теги можно фильтровать на главной.</div>
+      </div>
+
+      <div class="field">
         <div class="ing-head">
           <label>Ингредиенты</label>
           <button class="btn ghost small" onclick="addIng()">
@@ -166,6 +182,12 @@
           </button>
         </div>
         <div id="ing-list"></div>
+        <div class="ing-add-float" id="ingAddFloat" onclick="addIng()">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          </svg>
+          Ещё ингредиент
+        </div>
       </div>
 
       <div class="row-4">
@@ -238,6 +260,8 @@
       <div class="left">
         <button class="btn danger" id="deleteBtn" onclick="removeCurrent()" style="display:none">Удалить</button>
         <button class="btn" id="dupBtn" onclick="duplicateCurrent()" style="display:none">Дублировать</button>
+        <button class="btn" id="copyFromBtn" onclick="openCopyFrom()" style="display:none">Состав из...</button>
+        <button class="btn" id="historyBtn" onclick="openHistory()" style="display:none">История</button>
         <button class="btn" id="shareBtn" onclick="openShare()" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -353,6 +377,56 @@
       <div class="right">
         <button class="btn" onclick="copyMultiShare()">Копировать</button>
         <button class="btn primary" onclick="nativeMultiShare()">Отправить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- История версий -->
+<div class="overlay" id="historyOverlay">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:620px">
+    <div class="modal-head">
+      <h2>История изменений</h2>
+      <button class="btn ghost small" onclick="closeHistory()" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Сравнить версии</label>
+        <div class="history-pickers">
+          <select id="hist-from" onchange="renderHistoryDiff()"></select>
+          <span class="hist-arrow">→</span>
+          <select id="hist-to" onchange="renderHistoryDiff()"></select>
+        </div>
+      </div>
+      <div id="hist-body"></div>
+    </div>
+    <div class="modal-foot">
+      <div></div>
+      <div class="right">
+        <button class="btn primary" onclick="closeHistory()">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Копирование состава из другой проработки -->
+<div class="overlay" id="copyFromOverlay">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:620px">
+    <div class="modal-head">
+      <h2>Скопировать состав из...</h2>
+      <button class="btn ghost small" onclick="closeCopyFrom()" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Поиск</label>
+        <input id="copy-search" placeholder="Начни печатать название..." oninput="renderCopyFromList()">
+      </div>
+      <div id="copy-from-list" class="copy-from-list"></div>
+    </div>
+    <div class="modal-foot">
+      <div></div>
+      <div class="right">
+        <button class="btn" onclick="closeCopyFrom()">Отмена</button>
       </div>
     </div>
   </div>

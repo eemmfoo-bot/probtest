@@ -6,19 +6,22 @@ const STATUS_COLOR = {idea:'var(--warn)', test:'var(--info)', done:'var(--ok)', 
 let items = [];
 let currentFilter = 'all';
 let currentCatFilter = 'all';
+let currentTagFilter = 'all';
 let editingId = null;
 let currentVersionIdx = 0;
 let sharingId = null;
 let selectedIds = new Set();
+let expandedIds = new Set();
 let draftTimer = null;
 let popoverTarget = null;
+let copyFromTargetId = null;
 
 function genId(){ return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
 
 function emptyVersion(n){
   return {
     n: n, status: 'idea', ingredients: [{name:'',qty:'',unit:''}],
-    dishware: '',
+    dishware: '', tags: '',
     before:'', after:'', unit:'мл', cost:'', price:'',
     need:'', mech:'', how:'', notes:'',
     updated: Date.now(), created: Date.now()
@@ -29,7 +32,9 @@ function migrateItem(it){
   if(it && it.versions && Array.isArray(it.versions)){
     it.versions.forEach(v=>{
       if(typeof v.dishware === 'undefined') v.dishware = '';
+      if(typeof v.tags === 'undefined') v.tags = '';
     });
+    if(typeof it.cat === 'undefined') it.cat = '';
     return it;
   }
   const v1 = {
@@ -37,6 +42,7 @@ function migrateItem(it){
     status: it.status || 'idea',
     ingredients: it.ingredients || [],
     dishware: it.dishware || '',
+    tags: it.tags || '',
     before: it.before || '',
     after: it.after || '',
     unit: it.unit || '',
@@ -126,7 +132,14 @@ function calcChange(v1, v2){
   const pct = (diff / a) * 100;
   return { diff, pct, sign: diff > 0 ? '+' : '' };
 }
+function parseTags(str){
+  return String(str||'').split(',').map(t=>t.trim()).filter(Boolean);
+}
+function tagsString(arr){
+  return (arr||[]).join(', ');
+}
 
+/* ====== РЕНДЕР ФИЛЬТРОВ ====== */
 function renderStatusFilters(){
   const counts = {all: items.length};
   ['idea','test','done','archive'].forEach(s=>{
@@ -142,6 +155,7 @@ function renderStatusFilters(){
     </div>
   `).join('');
 }
+
 function renderCatFilters(){
   const used = new Set();
   items.forEach(i=>{ if(i.cat) used.add(i.cat); });
@@ -163,12 +177,41 @@ function renderCatFilters(){
       </div>`;
     }).join('');
 }
+
+function renderTagFilters(){
+  const used = new Map();
+  items.forEach(it=>{
+    const v = it.versions[it.currentVersion - 1];
+    if(!v) return;
+    parseTags(v.tags).forEach(t=>{
+      used.set(t, (used.get(t) || 0) + 1);
+    });
+  });
+  if(used.size === 0){
+    document.getElementById('tag-filters').innerHTML = '';
+    return;
+  }
+  const sorted = Array.from(used.keys()).sort();
+  document.getElementById('tag-filters').innerHTML =
+    `<div class="label-pill">Теги</div>` +
+    `<div class="chip ${currentTagFilter==='all'?'active':''}" onclick="setTagFilter('all')">Все</div>` +
+    sorted.map(t=>{
+      const safe = esc(t).replace(/'/g,"\\'");
+      return `<div class="chip ${currentTagFilter===t?'active':''}" onclick="setTagFilter('${safe}')">
+        ${esc(t)}<span class="num">${used.get(t)}</span>
+      </div>`;
+    }).join('');
+}
+
 function setFilter(f){ currentFilter = f; render(); }
 function setCatFilter(c){ currentCatFilter = c; render(); }
+function setTagFilter(t){ currentTagFilter = t; render(); }
 
+/* ====== РЕНДЕР СПИСКА ====== */
 function render(){
   renderStatusFilters();
   renderCatFilters();
+  renderTagFilters();
   setStatus(false);
   const q = (document.getElementById('q').value || '').toLowerCase().trim();
   const sort = document.getElementById('sort').value;
@@ -179,9 +222,10 @@ function render(){
     if(!v) return false;
     if(currentFilter !== 'all' && v.status !== currentFilter) return false;
     if(currentCatFilter !== 'all' && it.cat !== currentCatFilter) return false;
+    if(currentTagFilter !== 'all' && !parseTags(v.tags).includes(currentTagFilter)) return false;
     if(!q) return true;
     const hay = [
-      it.title, it.cat, v.dishware, v.need, v.mech, v.how, v.notes,
+      it.title, it.cat, v.dishware, v.tags, v.need, v.mech, v.how, v.notes,
       ...(v.ingredients||[]).map(x=>x.name)
     ].join(' ').toLowerCase();
     return hay.includes(q);
@@ -225,41 +269,151 @@ function cardHTML(it){
   const fc = calcFC(v);
   const fcStr = fc !== null ? fc.toFixed(1) + '%' : '';
   const isSelected = selectedIds.has(it.id);
+  const isExpanded = expandedIds.has(it.id);
   const showV = it.versions.length > 1;
+  const tags = parseTags(v.tags);
 
   const iconTag = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/></svg>`;
   const iconGlass = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2h8l-1 8v9a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-9L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 2h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const iconFlask = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 3h6M10 3v5.5L5.5 17a2.5 2.5 0 0 0 2.2 3.5h8.6a2.5 2.5 0 0 0 2.2-3.5L14 8.5V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const iconScale = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v18M5 7h14M7 7l-3 6a3 3 0 0 0 6 0L7 7zM17 7l-3 6a3 3 0 0 0 6 0l-3-6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const iconCheck = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12 5 5 9-11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const iconChev = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  // Детали раскрытия — только заполненные поля
+  let details = '';
+  if(isExpanded){
+    const parts = [];
+    // Ингредиенты
+    if((v.ingredients||[]).length){
+      const ingHtml = v.ingredients.map(i=>{
+        const qty = i.qty ? ` — <b>${esc(i.qty)}${i.unit?' '+esc(i.unit):''}</b>` : '';
+        return `• ${esc(i.name)}${qty}`;
+      }).join('<br>');
+      parts.push(`<div class="detail-block">
+        <div class="detail-label">Состав</div>
+        <div class="detail-ing">${ingHtml}</div>
+      </div>`);
+    }
+    // Выходы
+    if(v.before || v.after){
+      let yieldText = `${v.before||'—'} → ${v.after||'—'}${v.unit?' '+esc(v.unit):''}`;
+      const ch = calcChange(v.before, v.after);
+      if(ch){
+        const label = ch.diff > 0 ? 'прирост' : (ch.diff < 0 ? 'потери' : 'без изменений');
+        yieldText += ` · ${label} ${ch.sign}${ch.diff.toFixed(0)} (${ch.sign}${ch.pct.toFixed(1)}%)`;
+      }
+      parts.push(`<div class="detail-block">
+        <div class="detail-label">Выход</div>
+        <div class="detail-text">${esc(yieldText)}</div>
+      </div>`);
+    }
+    // Экономика
+    if(v.cost || v.price){
+      const fc2 = calcFC(v);
+      const items2 = [];
+      if(v.cost) items2.push(`Себестоимость: <b>${esc(v.cost)} ₽</b>`);
+      if(v.price) items2.push(`Цена: <b>${esc(v.price)} ₽</b>`);
+      if(fc2 !== null) items2.push(`FC: <b>${fc2.toFixed(1)}%</b>`);
+      parts.push(`<div class="detail-block">
+        <div class="detail-label">Экономика</div>
+        <div class="detail-econ">${items2.join(' · ')}</div>
+      </div>`);
+    }
+    // Что нужно
+    if(v.need){
+      parts.push(`<div class="detail-block">
+        <div class="detail-label">Что нужно</div>
+        <div class="detail-text">${esc(v.need)}</div>
+      </div>`);
+    }
+    // Механика
+    if(v.mech){
+      parts.push(`<div class="detail-block">
+        <div class="detail-label">Механика</div>
+        <div class="detail-text">${esc(v.mech)}</div>
+      </div>`);
+    }
+    // Как готовится
+    if(v.how){
+      parts.push(`<div class="detail-block">
+        <div class="detail-label">Как готовится</div>
+        <div class="detail-text">${esc(v.how)}</div>
+      </div>`);
+    }
+    // Заметки
+    if(v.notes){
+      parts.push(`<div class="detail-block">
+        <div class="detail-label">Заметки</div>
+        <div class="detail-text">${esc(v.notes)}</div>
+      </div>`);
+    }
+    if(parts.length){
+      details = `<div class="card-details"><div class="card-details-inner">${parts.join('')}</div></div>`;
+    } else {
+      details = `<div class="card-details"><div class="card-details-inner">
+        <div class="detail-text" style="text-align:center;color:var(--text-muted)">Детали не заполнены</div>
+      </div></div>`;
+    }
+  }
 
   return `
-    <div class="card ${isSelected?'selected':''}" data-id="${it.id}" onclick="cardClick(event, '${it.id}')">
+    <div class="card ${isSelected?'selected':''} ${isExpanded?'expanded':''}"
+         style="--status-color:${STATUS_COLOR[v.status]||'var(--accent)'}"
+         data-id="${it.id}">
       <div class="card-check" onclick="toggleCardSelect(event, '${it.id}')" aria-label="Выбрать">
         ${iconCheck}
       </div>
-      <div class="card-head">
-        <h3>${esc(it.title)}${showV?`<span class="card-v-badge">v${it.currentVersion}</span>`:''}</h3>
-        <span class="status ${v.status}" onclick="openStatusPopover(event, '${it.id}')">${STATUS_LABEL[v.status]||''}</span>
+      <div onclick="cardClick(event, '${it.id}')">
+        <div class="card-head">
+          <h3>${esc(it.title)}${showV?`<span class="card-v-badge">v${it.currentVersion}</span>`:''}</h3>
+          <span class="status ${v.status}" onclick="openStatusPopover(event, '${it.id}')">${STATUS_LABEL[v.status]||''}</span>
+        </div>
+        <div class="card-meta">
+          ${it.cat?`<span>${iconTag}${esc(it.cat)}</span>`:''}
+          ${v.dishware?`<span>${iconGlass}${esc(v.dishware)}</span>`:''}
+          ${ingCount?`<span>${iconFlask}${ingCount}</span>`:''}
+          ${yieldStr?`<span>${iconScale}${esc(yieldStr)}</span>`:''}
+          ${fcStr?`<span class="fc">FC ${fcStr}</span>`:''}
+        </div>
+        ${v.need?`<div class="card-note">${esc(v.need)}</div>`:
+          v.notes?`<div class="card-note">${esc(v.notes)}</div>`:''}
+        ${tags.length?`<div class="card-tags">
+          ${tags.map(t=>`<span class="card-tag" onclick="event.stopPropagation(); setTagFilter('${esc(t).replace(/'/g,"\\'")}')">#${esc(t)}</span>`).join('')}
+        </div>`:''}
       </div>
-      <div class="card-meta">
-        ${it.cat?`<span>${iconTag}${esc(it.cat)}</span>`:''}
-        ${v.dishware?`<span>${iconGlass}${esc(v.dishware)}</span>`:''}
-        ${ingCount?`<span>${iconFlask}${ingCount}</span>`:''}
-        ${yieldStr?`<span>${iconScale}${esc(yieldStr)}</span>`:''}
-        ${fcStr?`<span class="fc">FC ${fcStr}</span>`:''}
+      ${details}
+      <div class="card-footer">
+        <div class="card-date">${fmtDate(it.updated)}</div>
+        <button class="card-expand-btn" onclick="toggleExpand(event, '${it.id}')">
+          <span>${isExpanded?'Свернуть':'Развернуть'}</span>
+          ${iconChev}
+        </button>
       </div>
-      ${v.need?`<div class="card-note">${esc(v.need)}</div>`:
-        v.notes?`<div class="card-note">${esc(v.notes)}</div>`:''}
-      <div class="card-date">${fmtDate(it.updated)}</div>
     </div>`;
 }
 
 function cardClick(ev, id){
-  if(ev.target.closest('.card-check') || ev.target.closest('.status')) return;
+  if(ev.target.closest('.card-check') || ev.target.closest('.status')
+     || ev.target.closest('.card-expand-btn') || ev.target.closest('.card-tag')) return;
   if(selectedIds.size > 0){ toggleCardSelect(ev, id); return; }
   openEditor(id);
 }
+
+function toggleExpand(ev, id){
+  ev.stopPropagation();
+  if(expandedIds.has(id)) expandedIds.delete(id);
+  else expandedIds.add(id);
+  // Перерисовываем только эту карточку
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if(!card) return;
+  const it = items.find(i=>i.id===id);
+  if(!it) return;
+  const temp = document.createElement('div');
+  temp.innerHTML = cardHTML(it);
+  card.replaceWith(temp.firstElementChild);
+}
+
 function toggleCardSelect(ev, id){
   ev.stopPropagation();
   if(selectedIds.has(id)) selectedIds.delete(id);
@@ -272,15 +426,46 @@ function clearSelection(){
   selectedIds.clear();
   updateSelectionBar();
   document.querySelectorAll('.card.selected').forEach(c=>c.classList.remove('selected'));
+  closeStatusPicker();
 }
 function updateSelectionBar(){
   const bar = document.getElementById('selectionBar');
   const cnt = document.getElementById('selCount');
   cnt.textContent = selectedIds.size;
   if(selectedIds.size > 0) bar.classList.add('show');
-  else bar.classList.remove('show');
+  else { bar.classList.remove('show'); closeStatusPicker(); }
 }
 
+function toggleStatusPicker(ev){
+  ev.stopPropagation();
+  const p = document.getElementById('bulkStatusPicker');
+  p.classList.toggle('open');
+}
+function closeStatusPicker(){
+  const p = document.getElementById('bulkStatusPicker');
+  if(p) p.classList.remove('open');
+}
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.status-picker-wrap')) closeStatusPicker();
+});
+
+async function bulkSetStatus(status){
+  if(!selectedIds.size) return;
+  const n = selectedIds.size;
+  if(!confirm(`Перевести ${n} ${plural(n,'проработку','проработки','проработок')} в статус «${STATUS_LABEL[status]}»?`)) return;
+  items.forEach(it=>{
+    if(selectedIds.has(it.id)){
+      it.versions[it.currentVersion - 1].status = status;
+      it.updated = Date.now();
+    }
+  });
+  saveLocal();
+  clearSelection();
+  render();
+  toast(`Обновлено: ${n}`);
+}
+
+/* ====== POPOVER СТАТУСА ====== */
 function openStatusPopover(ev, id){
   ev.stopPropagation();
   const pop = document.getElementById('statusPopover');
@@ -326,7 +511,7 @@ document.addEventListener('click', e=>{
     closeStatusPopover();
   }
 });
-
+/* ====== РЕДАКТОР ====== */
 function openEditor(id){
   editingId = id || null;
   currentVersionIdx = 0;
@@ -336,6 +521,8 @@ function openEditor(id){
   document.getElementById('modalTitle').textContent = it ? 'Редактировать' : 'Новая проработка';
   document.getElementById('deleteBtn').style.display = it ? 'inline-flex' : 'none';
   document.getElementById('dupBtn').style.display = it ? 'inline-flex' : 'none';
+  document.getElementById('copyFromBtn').style.display = it ? 'inline-flex' : 'none';
+  document.getElementById('historyBtn').style.display = (it && it.versions.length > 1) ? 'inline-flex' : 'none';
   document.getElementById('shareBtn').style.display = it ? 'inline-flex' : 'none';
 
   if(it){
@@ -370,6 +557,8 @@ function renderVersionTabs(it){
       Версия
     </div>
   `;
+  const histBtn = document.getElementById('historyBtn');
+  histBtn.style.display = (editingId && it.versions.length > 1) ? 'inline-flex' : 'none';
 }
 
 function switchVersion(idx){
@@ -392,6 +581,7 @@ function loadVersionIntoForm(it, idx){
   if(!v) return;
   document.getElementById('f-status').value = v.status || 'idea';
   document.getElementById('f-dishware').value = v.dishware || '';
+  document.getElementById('f-tags').value = v.tags || '';
   document.getElementById('f-before').value = v.before || '';
   document.getElementById('f-after').value = v.after || '';
   document.getElementById('f-unit').value = v.unit || 'мл';
@@ -416,6 +606,7 @@ function saveCurrentVersionToMemory(){
   const el = id => document.getElementById(id);
   v.status = el('f-status').value;
   v.dishware = el('f-dishware').value.trim();
+  v.tags = el('f-tags').value.trim();
   v.before = el('f-before').value.trim();
   v.after = el('f-after').value.trim();
   v.unit = el('f-unit').value;
@@ -454,17 +645,30 @@ function closeEditor(){
   window._tempNewItem = null;
 }
 
+/* ====== ИНГРЕДИЕНТЫ ====== */
 function addIng(data){
   data = data || {name:'',qty:'',unit:''};
   const wrap = document.createElement('div');
   wrap.className = 'ing-row';
+  wrap.draggable = false;
   wrap.innerHTML = `
+    <button class="ing-drag" aria-label="Перетащить" type="button">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="9" cy="6" r="1.5" fill="currentColor"/>
+        <circle cx="15" cy="6" r="1.5" fill="currentColor"/>
+        <circle cx="9" cy="12" r="1.5" fill="currentColor"/>
+        <circle cx="15" cy="12" r="1.5" fill="currentColor"/>
+        <circle cx="9" cy="18" r="1.5" fill="currentColor"/>
+        <circle cx="15" cy="18" r="1.5" fill="currentColor"/>
+      </svg>
+    </button>
     <input placeholder="Ингредиент" value="${esc(data.name)}" data-k="name">
-    <input placeholder="Кол-во" value="${esc(data.qty)}" data-k="qty">
+    <input placeholder="Кол-во" value="${esc(data.qty)}" data-k="qty" inputmode="decimal">
     <input placeholder="ед." value="${esc(data.unit)}" data-k="unit">
-    <button class="del" onclick="this.parentNode.remove()" aria-label="Удалить">✕</button>
+    <button class="del" type="button" aria-label="Удалить" onclick="this.parentNode.remove()">✕</button>
   `;
   document.getElementById('ing-list').appendChild(wrap);
+  attachIngDragEvents(wrap);
 }
 
 function collectIngredients(){
@@ -478,6 +682,164 @@ function collectIngredients(){
   return out;
 }
 
+/* Drag-n-drop порядка ингредиентов */
+let dragSrcEl = null;
+
+function attachIngDragEvents(el){
+  const handle = el.querySelector('.ing-drag');
+  if(!handle) return;
+
+  // Desktop drag
+  handle.addEventListener('mousedown', ()=>{
+    el.draggable = true;
+  });
+  el.addEventListener('dragstart', e=>{
+    dragSrcEl = el;
+    el.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/html', ''); }catch(err){}
+  });
+  el.addEventListener('dragend', ()=>{
+    el.classList.remove('dragging');
+    el.draggable = false;
+    document.querySelectorAll('.ing-row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+    dragSrcEl = null;
+  });
+  el.addEventListener('dragover', e=>{
+    e.preventDefault();
+    if(!dragSrcEl || dragSrcEl === el) return;
+    el.classList.add('drag-over');
+  });
+  el.addEventListener('dragleave', ()=>{
+    el.classList.remove('drag-over');
+  });
+  el.addEventListener('drop', e=>{
+    e.preventDefault();
+    el.classList.remove('drag-over');
+    if(!dragSrcEl || dragSrcEl === el) return;
+    const parent = el.parentNode;
+    const children = Array.from(parent.children);
+    const srcIdx = children.indexOf(dragSrcEl);
+    const dstIdx = children.indexOf(el);
+    if(srcIdx < dstIdx){
+      parent.insertBefore(dragSrcEl, el.nextSibling);
+    } else {
+      parent.insertBefore(dragSrcEl, el);
+    }
+    // после перемещения — сохранить порядок в памяти (на случай автосохранения)
+    scheduleDraft();
+  });
+
+  // Touch — простое решение через длинное нажатие и перемещение над элементами
+  let touchTimer = null;
+  let touchActive = false;
+  handle.addEventListener('touchstart', e=>{
+    touchTimer = setTimeout(()=>{
+      touchActive = true;
+      el.classList.add('dragging');
+      if(navigator.vibrate) navigator.vibrate(20);
+    }, 400);
+  }, {passive:true});
+  handle.addEventListener('touchmove', e=>{
+    if(!touchActive) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetRow = elBelow?.closest?.('.ing-row');
+    document.querySelectorAll('.ing-row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+    if(targetRow && targetRow !== el){
+      targetRow.classList.add('drag-over');
+    }
+  }, {passive:false});
+  handle.addEventListener('touchend', e=>{
+    clearTimeout(touchTimer);
+    if(!touchActive) return;
+    touchActive = false;
+    el.classList.remove('dragging');
+    const touch = e.changedTouches[0];
+    const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetRow = elBelow?.closest?.('.ing-row');
+    document.querySelectorAll('.ing-row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+    if(targetRow && targetRow !== el){
+      const parent = el.parentNode;
+      const children = Array.from(parent.children);
+      const srcIdx = children.indexOf(el);
+      const dstIdx = children.indexOf(targetRow);
+      if(srcIdx < dstIdx){
+        parent.insertBefore(el, targetRow.nextSibling);
+      } else {
+        parent.insertBefore(el, targetRow);
+      }
+      scheduleDraft();
+    }
+  });
+  handle.addEventListener('touchcancel', ()=>{
+    clearTimeout(touchTimer);
+    touchActive = false;
+    el.classList.remove('dragging');
+    document.querySelectorAll('.ing-row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+  });
+}
+
+/* ====== Enter → следующее поле + автоскролл ====== */
+document.addEventListener('keydown', e=>{
+  if(e.key !== 'Enter') return;
+  const overlay = document.getElementById('overlay');
+  if(!overlay.classList.contains('open')) return;
+  const target = e.target;
+  if(!target || target.tagName === 'TEXTAREA') return;
+  if(target.id === 'f-need' || target.id === 'f-mech' || target.id === 'f-how' || target.id === 'f-notes') return;
+
+  e.preventDefault();
+  const modal = overlay.querySelector('.modal');
+  if(!modal) return;
+
+  // Собираем все «переходимые» поля в порядке DOM
+  const fields = Array.from(modal.querySelectorAll('input:not([readonly]):not([type=file]), select, textarea'))
+    .filter(el => el.offsetParent !== null && !el.disabled);
+
+  const idx = fields.indexOf(target);
+  if(idx === -1) return;
+
+  // Особый случай: в ингредиентах на последнем input жмём Enter — добавляем новый ряд
+  if(target.dataset.k === 'unit'){
+    const row = target.closest('.ing-row');
+    const rowInputs = Array.from(row.querySelectorAll('input'));
+    const isLast = rowInputs[rowInputs.length - 1] === target;
+    // в нашей строке единица — не последний input (после неё кнопка), поэтому просто переходим к следующему ингредиенту
+    const nextRow = row.nextElementSibling;
+    if(!nextRow || !nextRow.classList.contains('ing-row')){
+      // последний ряд — добавляем новый
+      addIng();
+      // и переходим в первое поле нового ряда
+      const rows = document.querySelectorAll('#ing-list .ing-row');
+      const newRow = rows[rows.length - 1];
+      const newInput = newRow.querySelector('input');
+      if(newInput){
+        newInput.focus();
+        scrollToField(newInput);
+      }
+      scheduleDraft();
+      return;
+    }
+  }
+
+  const next = fields[idx + 1];
+  if(next){
+    next.focus();
+    scrollToField(next);
+  }
+});
+
+function scrollToField(el){
+  try{
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+  }catch(e){
+    el.scrollIntoView(false);
+  }
+}
+
+/* ====== Выходы и FC ====== */
 function updateLoss(){
   const v1 = parseFloat(document.getElementById('f-before').value);
   const v2 = parseFloat(document.getElementById('f-after').value);
@@ -519,6 +881,7 @@ document.addEventListener('change', e=>{
   if(document.getElementById('overlay').classList.contains('open')) scheduleDraft();
 });
 
+/* ====== ЧЕРНОВИК ====== */
 function scheduleDraft(){
   clearTimeout(draftTimer);
   setStatus(true);
@@ -576,6 +939,8 @@ function openEditorFromDraft(d){
   document.getElementById('modalTitle').textContent = d.editingId ? 'Редактировать' : 'Новая проработка';
   document.getElementById('deleteBtn').style.display = d.editingId ? 'inline-flex' : 'none';
   document.getElementById('dupBtn').style.display = d.editingId ? 'inline-flex' : 'none';
+  document.getElementById('copyFromBtn').style.display = d.editingId ? 'inline-flex' : 'none';
+  document.getElementById('historyBtn').style.display = (d.editingId && it.versions.length > 1) ? 'inline-flex' : 'none';
   document.getElementById('shareBtn').style.display = d.editingId ? 'inline-flex' : 'none';
   document.getElementById('f-title').value = it.title || '';
   document.getElementById('f-cat').value = it.cat || '';
@@ -592,6 +957,7 @@ function discardDraft(){
   window._draft = null;
 }
 
+/* ====== СОХРАНЕНИЕ / УДАЛЕНИЕ / ДУБЛЬ ====== */
 function saveCurrent(){
   const title = document.getElementById('f-title').value.trim();
   if(!title){
@@ -658,6 +1024,202 @@ function duplicateCurrent(){
   toast('Дубликат создан');
 }
 
+/* ====== ИСТОРИЯ ВЕРСИЙ ====== */
+function openHistory(){
+  if(!editingId) return;
+  const it = items.find(i=>i.id === editingId);
+  if(!it || it.versions.length < 2) return;
+  saveCurrentVersionToMemory();
+  const fromSel = document.getElementById('hist-from');
+  const toSel = document.getElementById('hist-to');
+  const opts = it.versions.map(v=>`<option value="${v.n}">v${v.n}</option>`).join('');
+  fromSel.innerHTML = opts;
+  toSel.innerHTML = opts;
+  fromSel.value = String(it.versions[it.versions.length - 2].n);
+  toSel.value = String(it.versions[it.versions.length - 1].n);
+  renderHistoryDiff();
+  document.getElementById('historyOverlay').classList.add('open');
+  document.body.classList.add('modal-open');
+}
+function closeHistory(){
+  document.getElementById('historyOverlay').classList.remove('open');
+  document.body.classList.remove('modal-open');
+}
+
+function renderHistoryDiff(){
+  if(!editingId) return;
+  const it = items.find(i=>i.id === editingId);
+  if(!it) return;
+  const fromN = parseInt(document.getElementById('hist-from').value);
+  const toN = parseInt(document.getElementById('hist-to').value);
+  const vA = it.versions.find(x=>x.n===fromN);
+  const vB = it.versions.find(x=>x.n===toN);
+  const body = document.getElementById('hist-body');
+  if(!vA || !vB){
+    body.innerHTML = '<div class="diff-empty">Выбери две версии</div>';
+    return;
+  }
+  if(vA.n === vB.n){
+    body.innerHTML = '<div class="diff-empty">Это одна и та же версия</div>';
+    return;
+  }
+
+  const parts = [];
+
+  // Статус
+  if(vA.status !== vB.status){
+    parts.push(`<div class="diff-item chg">
+      <div class="diff-label">Статус</div>
+      ${esc(STATUS_LABEL[vA.status])} → ${esc(STATUS_LABEL[vB.status])}
+    </div>`);
+  }
+
+  // Посуда
+  if((vA.dishware||'') !== (vB.dishware||'')){
+    if(!vA.dishware && vB.dishware){
+      parts.push(`<div class="diff-item add"><div class="diff-label">Посуда</div>+ ${esc(vB.dishware)}</div>`);
+    } else if(vA.dishware && !vB.dishware){
+      parts.push(`<div class="diff-item del"><div class="diff-label">Посуда</div>− ${esc(vA.dishware)}</div>`);
+    } else {
+      parts.push(`<div class="diff-item chg"><div class="diff-label">Посуда</div>${esc(vA.dishware)} → ${esc(vB.dishware)}</div>`);
+    }
+  }
+
+  // Теги
+  const tagsA = parseTags(vA.tags);
+  const tagsB = parseTags(vB.tags);
+  const tagsAdded = tagsB.filter(t=>!tagsA.includes(t));
+  const tagsRemoved = tagsA.filter(t=>!tagsB.includes(t));
+  if(tagsAdded.length || tagsRemoved.length){
+    let html = '';
+    if(tagsAdded.length) html += `<div style="color:var(--ok)">+ ${tagsAdded.map(esc).join(', ')}</div>`;
+    if(tagsRemoved.length) html += `<div style="color:var(--danger)">− ${tagsRemoved.map(esc).join(', ')}</div>`;
+    parts.push(`<div class="diff-item chg"><div class="diff-label">Теги</div>${html}</div>`);
+  }
+
+  // Ингредиенты
+  const ingA = vA.ingredients || [];
+  const ingB = vB.ingredients || [];
+  const keyOf = i => (i.name||'').toLowerCase() + '|' + (i.qty||'') + '|' + (i.unit||'');
+  const nameOf = i => (i.name||'').toLowerCase();
+  const mapA = new Map(ingA.map(i=>[nameOf(i), i]));
+  const mapB = new Map(ingB.map(i=>[nameOf(i), i]));
+
+  ingB.forEach(iB=>{
+    const name = nameOf(iB);
+    const iA = mapA.get(name);
+    const strB = `${iB.name}${iB.qty?' — '+iB.qty+(iB.unit?' '+iB.unit:''):''}`;
+    if(!iA){
+      parts.push(`<div class="diff-item add"><div class="diff-label">Ингредиент добавлен</div>+ ${esc(strB)}</div>`);
+    } else if(keyOf(iA) !== keyOf(iB)){
+      const strA = `${iA.name}${iA.qty?' — '+iA.qty+(iA.unit?' '+iA.unit:''):''}`;
+      parts.push(`<div class="diff-item chg"><div class="diff-label">Ингредиент изменён</div>${esc(strA)} → ${esc(strB)}</div>`);
+    }
+  });
+  ingA.forEach(iA=>{
+    const name = nameOf(iA);
+    if(!mapB.has(name)){
+      const strA = `${iA.name}${iA.qty?' — '+iA.qty+(iA.unit?' '+iA.unit:''):''}`;
+      parts.push(`<div class="diff-item del"><div class="diff-label">Ингредиент удалён</div>− ${esc(strA)}</div>`);
+    }
+  });
+
+  // Выходы
+  if((vA.before||'') !== (vB.before||'')){
+    parts.push(`<div class="diff-item chg"><div class="diff-label">Выход 1</div>${esc(vA.before||'—')} → ${esc(vB.before||'—')}</div>`);
+  }
+  if((vA.after||'') !== (vB.after||'')){
+    parts.push(`<div class="diff-item chg"><div class="diff-label">Выход 2</div>${esc(vA.after||'—')} → ${esc(vB.after||'—')}</div>`);
+  }
+  if((vA.unit||'') !== (vB.unit||'')){
+    parts.push(`<div class="diff-item chg"><div class="diff-label">Единица</div>${esc(vA.unit||'—')} → ${esc(vB.unit||'—')}</div>`);
+  }
+
+  // Экономика
+  if((vA.cost||'') !== (vB.cost||'')){
+    parts.push(`<div class="diff-item chg"><div class="diff-label">Себестоимость</div>${esc(vA.cost||'—')} → ${esc(vB.cost||'—')}</div>`);
+  }
+  if((vA.price||'') !== (vB.price||'')){
+    parts.push(`<div class="diff-item chg"><div class="diff-label">Цена порции</div>${esc(vA.price||'—')} → ${esc(vB.price||'—')}</div>`);
+  }
+
+  // Текстовые поля
+  [['need','Что нужно'],['mech','Механика'],['how','Как готовится'],['notes','Заметки']].forEach(([k, label])=>{
+    const a = (vA[k]||'').trim();
+    const b = (vB[k]||'').trim();
+    if(a === b) return;
+    if(!a && b){
+      parts.push(`<div class="diff-item add"><div class="diff-label">${label} — добавлено</div>${esc(b)}</div>`);
+    } else if(a && !b){
+      parts.push(`<div class="diff-item del"><div class="diff-label">${label} — удалено</div>${esc(a)}</div>`);
+    } else {
+      parts.push(`<div class="diff-item chg"><div class="diff-label">${label}</div>
+        <div style="color:var(--danger);text-decoration:line-through;opacity:.7">${esc(a)}</div>
+        <div style="color:var(--ok);margin-top:4px">${esc(b)}</div>
+      </div>`);
+    }
+  });
+
+  body.innerHTML = parts.length
+    ? parts.join('')
+    : '<div class="diff-empty">Версии идентичны по содержимому</div>';
+}
+
+/* ====== КОПИРОВАНИЕ СОСТАВА ИЗ ДРУГОЙ ПРОРАБОТКИ ====== */
+function openCopyFrom(){
+  if(!editingId) return;
+  copyFromTargetId = null;
+  document.getElementById('copy-search').value = '';
+  renderCopyFromList();
+  document.getElementById('copyFromOverlay').classList.add('open');
+  document.body.classList.add('modal-open');
+}
+function closeCopyFrom(){
+  document.getElementById('copyFromOverlay').classList.remove('open');
+  document.body.classList.remove('modal-open');
+  copyFromTargetId = null;
+}
+function renderCopyFromList(){
+  const q = (document.getElementById('copy-search').value || '').toLowerCase().trim();
+  const list = document.getElementById('copy-from-list');
+  const candidates = items.filter(i=>{
+    if(i.id === editingId) return false;
+    if(!q) return true;
+    const v = i.versions[i.currentVersion - 1];
+    const hay = [i.title, i.cat, ...(v.ingredients||[]).map(x=>x.name)].join(' ').toLowerCase();
+    return hay.includes(q);
+  }).slice(0, 50);
+
+  if(!candidates.length){
+    list.innerHTML = '<div class="diff-empty">Ничего не найдено</div>';
+    return;
+  }
+  list.innerHTML = candidates.map(it=>{
+    const v = it.versions[it.currentVersion - 1];
+    const ingCount = (v.ingredients||[]).length;
+    return `<div class="copy-item" onclick="pickCopyFrom('${it.id}')">
+      <div class="copy-title">${esc(it.title)}</div>
+      <div class="copy-sub">${it.cat?esc(it.cat)+' · ':''}${ingCount} ингр.${it.versions.length>1?' · v'+it.currentVersion:''}</div>
+    </div>`;
+  }).join('');
+}
+function pickCopyFrom(id){
+  const src = items.find(i=>i.id===id);
+  if(!src) return;
+  const srcV = src.versions[src.currentVersion - 1];
+  if(!confirm(`Заменить состав текущей версии составом из «${src.title}»?`)) return;
+  // перезаписываем ингредиенты в текущей форме
+  document.getElementById('ing-list').innerHTML = '';
+  const ings = (srcV.ingredients && srcV.ingredients.length) ? srcV.ingredients : [{name:'',qty:'',unit:''}];
+  ings.forEach(addIng.bind(null));
+  // единицу тоже подтянем, если она есть
+  if(srcV.unit) document.getElementById('f-unit').value = srcV.unit;
+  scheduleDraft();
+  closeCopyFrom();
+  toast('Состав скопирован');
+}
+
+/* ====== SHARE ====== */
 function openShare(){
   if(!editingId) return;
   saveCurrentVersionToMemory();
@@ -688,6 +1250,8 @@ function buildShareText(){
   lines.push('Проработка: ' + it.title + (it.versions.length > 1 ? ' (v' + v.n + ')' : ''));
   if(it.cat) lines.push('Категория: ' + it.cat);
   if(v.dishware) lines.push('Посуда: ' + v.dishware);
+  const tags = parseTags(v.tags);
+  if(tags.length) lines.push('Теги: ' + tags.map(t=>'#'+t).join(' '));
   lines.push('Статус: ' + STATUS_LABEL[v.status]);
   lines.push('');
 
@@ -758,8 +1322,10 @@ async function nativeShare(){
   }
 }
 
+/* ====== SHARE НЕСКОЛЬКИХ ====== */
 function shareSelected(){
   if(!selectedIds.size) return;
+  closeStatusPicker();
   document.getElementById('shareMultiOverlay').classList.add('open');
   document.body.classList.add('modal-open');
   buildMultiShareText();
@@ -816,6 +1382,8 @@ function buildMultiShareText(){
       lines.push('═══════════════════════');
       if(it.cat) lines.push('Категория: ' + it.cat);
       if(v.dishware) lines.push('Посуда: ' + v.dishware);
+      const tags = parseTags(v.tags);
+      if(tags.length) lines.push('Теги: ' + tags.map(t=>'#'+t).join(' '));
       lines.push('Статус: ' + STATUS_LABEL[v.status]);
       lines.push('');
       lines.push('СОСТАВ:');
@@ -878,6 +1446,7 @@ async function copyToClipboard(text){
   }
 }
 
+/* ====== BACKUP ====== */
 function downloadBackup(){
   const data = JSON.stringify(items, null, 2);
   const blob = new Blob([data], {type:'application/json'});
@@ -921,6 +1490,7 @@ function uploadBackup(file){
   reader.readAsText(file);
 }
 
+/* ====== SETTINGS ====== */
 function openSettings(){
   document.getElementById('s-local-count').textContent = items.length;
   const totalVersions = items.reduce((s, i)=>s + i.versions.length, 0);
@@ -933,6 +1503,7 @@ function closeSettings(){
   document.body.classList.remove('modal-open');
 }
 
+/* ====== TOAST ====== */
 let toastTimer;
 function toast(msg){
   const t = document.getElementById('toast');
@@ -942,6 +1513,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2000);
 }
 
+/* ====== EVENTS ====== */
 document.getElementById('overlay').addEventListener('click', e=>{
   if(e.target.id === 'overlay') closeEditor();
 });
@@ -954,15 +1526,23 @@ document.getElementById('shareOverlay').addEventListener('click', e=>{
 document.getElementById('shareMultiOverlay').addEventListener('click', e=>{
   if(e.target.id === 'shareMultiOverlay') closeShareMulti();
 });
+document.getElementById('historyOverlay').addEventListener('click', e=>{
+  if(e.target.id === 'historyOverlay') closeHistory();
+});
+document.getElementById('copyFromOverlay').addEventListener('click', e=>{
+  if(e.target.id === 'copyFromOverlay') closeCopyFrom();
+});
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape'){
-    closeEditor(); closeSettings(); closeShare(); closeShareMulti(); closeStatusPopover();
+    closeEditor(); closeSettings(); closeShare(); closeShareMulti();
+    closeHistory(); closeCopyFrom(); closeStatusPopover(); closeStatusPicker();
   }
   if((e.metaKey||e.ctrlKey) && e.key === 'Enter' && document.getElementById('overlay').classList.contains('open')){
     saveCurrent();
   }
 });
 
+/* ====== INIT ====== */
 loadLocal();
 render();
 checkDraft();

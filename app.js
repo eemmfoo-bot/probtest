@@ -1,13 +1,16 @@
 const LS_DATA = 'pm_data_v2';
 const LS_DRAFT = 'pm_draft_v1';
 const LS_LAST = 'pm_last_opened_v1';
+const LS_THEME = 'pm_theme_v1';
 const STATUS_LABEL = {idea:'Идея', test:'Тестирую', done:'Готово', archive:'Архив'};
 const STATUS_COLOR = {idea:'var(--warn)', test:'var(--info)', done:'var(--ok)', archive:'var(--text-muted)'};
+const DIFF_ORDER = ['Простой', 'Средний', 'Сложный', 'Профи'];
 
 let items = [];
 let currentFilter = 'all';
 let currentCatFilter = 'all';
 let currentTagFilter = 'all';
+let currentDiffFilter = 'all';
 let editingId = null;
 let currentVersionIdx = 0;
 let sharingId = null;
@@ -139,6 +142,40 @@ function parseTags(str){
   return String(str||'').split(',').map(t=>t.trim()).filter(Boolean);
 }
 
+/* ====== ТЕМА ====== */
+function getCurrentTheme(){
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+function applyTheme(t){
+  if(t === 'light'){
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  try{ localStorage.setItem(LS_THEME, t); }catch(e){}
+  updateThemeIcon();
+  // обновляем meta theme-color для мобилки
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute('content', t === 'light' ? '#f4f1ec' : '#061e27');
+}
+function updateThemeIcon(){
+  const icon = document.getElementById('themeIcon');
+  if(!icon) return;
+  const t = getCurrentTheme();
+  if(t === 'light'){
+    // показываем солнце
+    icon.innerHTML = '<circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>';
+  } else {
+    // показываем луну
+    icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+}
+function toggleTheme(){
+  const t = getCurrentTheme();
+  applyTheme(t === 'light' ? 'dark' : 'light');
+}
+
+/* ====== ФИЛЬТРЫ ====== */
 function renderStatusFilters(){
   const counts = {all: items.length};
   ['idea','test','done','archive'].forEach(s=>{
@@ -194,14 +231,40 @@ function renderTagFilters(){
     }).join('');
 }
 
+function renderDifficultyFilters(){
+  const used = new Map();
+  items.forEach(it=>{
+    const v = it.versions[it.currentVersion - 1];
+    if(!v || !v.difficulty) return;
+    used.set(v.difficulty, (used.get(v.difficulty) || 0) + 1);
+  });
+  if(used.size === 0){ document.getElementById('difficulty-filters').innerHTML = ''; return; }
+  // сортируем по порядку DIFF_ORDER
+  const sorted = DIFF_ORDER.filter(d => used.has(d));
+  // добавляем нестандартные, если есть
+  Array.from(used.keys()).forEach(d => { if(!DIFF_ORDER.includes(d)) sorted.push(d); });
+  document.getElementById('difficulty-filters').innerHTML =
+    `<div class="label-pill">Сложность</div>` +
+    `<div class="chip ${currentDiffFilter==='all'?'active':''}" onclick="setDiffFilter('all')">Все</div>` +
+    sorted.map(d=>{
+      const safe = esc(d).replace(/'/g,"\\'");
+      return `<div class="chip ${currentDiffFilter===d?'active':''}" onclick="setDiffFilter('${safe}')">
+        ${esc(d)}<span class="num">${used.get(d)}</span>
+      </div>`;
+    }).join('');
+}
+
 function setFilter(f){ currentFilter = f; render(); }
 function setCatFilter(c){ currentCatFilter = c; render(); }
 function setTagFilter(t){ currentTagFilter = t; render(); }
+function setDiffFilter(d){ currentDiffFilter = d; render(); }
 
+/* ====== РЕНДЕР СПИСКА ====== */
 function render(){
   renderStatusFilters();
   renderCatFilters();
   renderTagFilters();
+  renderDifficultyFilters();
   setStatus(false);
   const q = (document.getElementById('q').value || '').toLowerCase().trim();
   const sort = document.getElementById('sort').value;
@@ -213,6 +276,7 @@ function render(){
     if(currentFilter !== 'all' && v.status !== currentFilter) return false;
     if(currentCatFilter !== 'all' && it.cat !== currentCatFilter) return false;
     if(currentTagFilter !== 'all' && !parseTags(v.tags).includes(currentTagFilter)) return false;
+    if(currentDiffFilter !== 'all' && v.difficulty !== currentDiffFilter) return false;
     if(!q) return true;
     const hay = [
       it.title, it.cat, v.dishware, v.tags, v.ice, v.temp, v.garnish, v.difficulty,
@@ -268,6 +332,8 @@ function cardHTML(it){
   const iconGlass = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2h8l-1 8v9a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-9L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 2h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const iconFlask = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 3h6M10 3v5.5L5.5 17a2.5 2.5 0 0 0 2.2 3.5h8.6a2.5 2.5 0 0 0 2.2-3.5L14 8.5V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const iconScale = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v18M5 7h14M7 7l-3 6a3 3 0 0 0 6 0L7 7zM17 7l-3 6a3 3 0 0 0 6 0l-3-6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const iconClock = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const iconDiff = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/></svg>`;
   const iconCheck = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="m5 12 5 5 9-11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const iconChev = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="6 9 12 15 18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -348,6 +414,8 @@ function cardHTML(it){
           ${ingCount?`<span>${iconFlask}${ingCount}</span>`:''}
           ${yieldStr?`<span>${iconScale}${esc(yieldStr)}</span>`:''}
           ${fcStr?`<span class="fc">FC ${fcStr}</span>`:''}
+          ${v.time?`<span class="time-ico">${iconClock}${esc(v.time)} мин</span>`:''}
+          ${v.difficulty?`<span class="diff-ico">${iconDiff}${esc(v.difficulty)}</span>`:''}
         </div>
         ${v.need?`<div class="card-note">${esc(v.need)}</div>`:
           v.notes?`<div class="card-note">${esc(v.notes)}</div>`:''}
@@ -484,7 +552,6 @@ document.addEventListener('click', e=>{
     closeStatusPopover();
   }
 });
-
 /* ====== ПАРСЕР ИНГРЕДИЕНТОВ ====== */
 function openParser(){
   const input = document.getElementById('parser-input');
@@ -1613,6 +1680,8 @@ document.addEventListener('keydown', e=>{
   }
 });
 
+/* ====== INIT ====== */
+updateThemeIcon();
 loadLocal();
 render();
 checkDraft();

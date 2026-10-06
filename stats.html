@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#061e27">
+<meta name="apple-mobile-web-app-title" content="Статистика">
+<title>Пинта — Статистика</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-primary:#061e27; --bg-secondary:#0a2835; --bg-card:#0e3240;
+    --bg-card-hover:#133d4d; --accent:#c9a06c; --accent-light:#d4b07a;
+    --accent-dark:#a08050; --text-primary:#f0e6d8; --text-secondary:#b8a890;
+    --text-muted:#4a6a7a; --border:#1a4a5c; --border-hover:#245a6e;
+    --shadow:rgba(0,0,0,.5); --shadow-accent:rgba(201,160,108,.12);
+    --ok:#7bc79a; --warn:#d9b25c; --danger:#d97a7a; --info:#7aa9c9;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  [data-theme="light"]{
+    --bg-primary:#f4f1ec; --bg-secondary:#ffffff; --bg-card:#ffffff;
+    --bg-card-hover:#f9f6f0; --accent:#a67a45; --accent-light:#c9a06c;
+    --accent-dark:#7d5a30; --text-primary:#1a1a1a; --text-secondary:#4a4a4a;
+    --text-muted:#8a8a8a; --border:#e0dad0; --border-hover:#c9c0b0;
+    --shadow:rgba(0,0,0,.08); --shadow-accent:rgba(166,122,69,.15);
+    --ok:#3a8a5a; --warn:#b8860b; --danger:#c04545; --info:#3a6a9a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:var(--bg-primary);color:var(--text-primary);min-height:100dvh;
+    line-height:1.5;padding:calc(24px + var(--safe-top)) 20px calc(60px + var(--safe-bottom));
+    transition:background-color .25s, color .25s}
+  .wrap{max-width:900px;margin:0 auto}
+
+  header{display:flex;align-items:center;justify-content:space-between;
+    gap:16px;margin-bottom:28px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px;min-width:0}
+  .brand-mark{width:44px;height:44px;border-radius:10px;flex-shrink:0;
+    background:var(--bg-card);border:1px solid var(--border);
+    display:grid;place-items:center;color:var(--accent)}
+  .brand-mark svg{width:22px;height:22px}
+  h1{font-size:20px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+  .sub{color:var(--text-muted);font-size:12px;margin-top:3px;letter-spacing:.02em}
+
+  .btn{border:1px solid var(--border);background:var(--bg-card);
+    color:var(--text-primary);padding:10px 16px;border-radius:10px;
+    font-size:13.5px;font-weight:500;cursor:pointer;transition:.2s;
+    display:inline-flex;align-items:center;gap:8px;font-family:inherit;
+    text-decoration:none;white-space:nowrap}
+  .btn:hover{background:var(--bg-card-hover);border-color:var(--border-hover)}
+  .btn.icon{padding:0;width:42px;height:42px;justify-content:center}
+  .btn.icon svg{width:18px;height:18px}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+    gap:14px;margin-bottom:28px}
+  .kpi{background:var(--bg-card);border:1px solid var(--border);
+    border-radius:14px;padding:18px 20px;transition:.2s}
+  .kpi:hover{border-color:var(--border-hover)}
+  .kpi .kpi-label{font-size:10.5px;font-weight:600;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--text-muted);margin-bottom:8px}
+  .kpi .kpi-value{font-size:26px;font-weight:700;letter-spacing:-.02em;
+    line-height:1.1;font-variant-numeric:tabular-nums}
+  .kpi .kpi-sub{font-size:12px;color:var(--text-muted);margin-top:4px}
+  .kpi.accent .kpi-value{color:var(--accent)}
+  .kpi.ok .kpi-value{color:var(--ok)}
+  .kpi.warn .kpi-value{color:var(--warn)}
+  .kpi.info .kpi-value{color:var(--info)}
+
+  .section{background:var(--bg-card);border:1px solid var(--border);
+    border-radius:14px;padding:22px 24px;margin-bottom:18px}
+  .section-title{font-size:12px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.08em;color:var(--text-muted);
+    padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:18px;
+    display:flex;align-items:center;gap:8px}
+  .section-title svg{width:14px;height:14px;color:var(--accent)}
+
+  .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;
+    font-size:13.5px}
+  .bar-label{min-width:0;flex:0 0 auto;width:130px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    color:var(--text-primary);font-weight:500}
+  .bar-track{flex:1;height:8px;background:var(--bg-secondary);
+    border-radius:4px;overflow:hidden;position:relative}
+  .bar-fill{height:100%;background:var(--accent);border-radius:4px;
+    transition:width .5s cubic-bezier(.4,0,.2,1);min-width:2px}
+  .bar-fill.ok{background:var(--ok)}
+  .bar-fill.warn{background:var(--warn)}
+  .bar-fill.danger{background:var(--danger)}
+  .bar-fill.info{background:var(--info)}
+  .bar-value{flex:0 0 auto;font-variant-numeric:tabular-nums;
+    color:var(--text-secondary);font-size:13px;
+    min-width:52px;text-align:right}
+
+  .chart{display:flex;align-items:flex-end;gap:6px;height:150px;
+    padding:12px 0;margin-bottom:8px}
+  .chart-col{flex:1;display:flex;flex-direction:column;
+    align-items:center;justify-content:flex-end;gap:6px;min-width:0}
+  .chart-bar{width:100%;max-width:42px;background:var(--accent);
+    border-radius:6px 6px 0 0;min-height:4px;
+    transition:height .5s cubic-bezier(.4,0,.2,1);position:relative}
+  .chart-bar:hover{background:var(--accent-light)}
+  .chart-col .chart-val{font-size:10px;color:var(--text-muted);
+    font-variant-numeric:tabular-nums;font-weight:600}
+  .chart-col .chart-label{font-size:10px;color:var(--text-muted);
+    text-transform:uppercase;letter-spacing:.04em;font-weight:500;
+    white-space:nowrap}
+
+  .fc-dist{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .fc-cell{flex:1;min-width:110px;padding:14px 16px;border-radius:10px;
+    background:var(--bg-secondary);border:1px solid var(--border)}
+  .fc-cell .label{font-size:10.5px;font-weight:600;text-transform:uppercase;
+    letter-spacing:.06em;color:var(--text-muted);margin-bottom:6px}
+  .fc-cell .value{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+  .fc-cell.good .value{color:var(--ok)}
+  .fc-cell.mid .value{color:var(--warn)}
+  .fc-cell.bad .value{color:var(--danger)}
+
+  .tag-cloud{display:flex;flex-wrap:wrap;gap:8px}
+  .tag-cloud .tag{font-size:13px;padding:5px 11px;border-radius:8px;
+    background:rgba(201,160,108,.08);color:var(--accent);
+    border:1px solid rgba(201,160,108,.2);
+    font-weight:500}
+  .tag-cloud .tag.big{font-size:15px;padding:7px 14px;font-weight:600}
+  .tag-cloud .tag.huge{font-size:17px;padding:9px 16px;font-weight:700}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--text-muted);
+    font-size:14px}
+  .empty svg{width:48px;height:48px;opacity:.4;color:var(--accent);
+    margin-bottom:16px}
+
+  @media (max-width:600px){
+    body{padding-left:16px;padding-right:16px}
+    h1{font-size:18px}
+    .kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px}
+    .kpi{padding:14px 16px}
+    .kpi .kpi-value{font-size:22px}
+    .section{padding:18px 18px}
+    .bar-label{width:100px;font-size:12.5px}
+    .chart{height:120px;gap:4px}
+    .chart-bar{max-width:30px}
+  }
+</style>
+<script>
+  (function(){
+    try{
+      const t = localStorage.getItem('pm_theme_v1');
+      if(t === 'light') document.documentElement.setAttribute('data-theme','light');
+    }catch(e){}
+  })();
+</script>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 21h18M7 17V9M12 17V5M17 17v-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Статистика</h1>
+        <div class="sub">Аналитика по всем проработкам</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn icon" onclick="toggleTheme()" title="Сменить тему" id="themeBtn">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <a class="btn" href="index.html">← К проработкам</a>
+    </div>
+  </header>
+
+  <div id="content">
+    <div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      Загрузка...
+    </div>
+  </div>
+
+</div>
+
+<script>
+const LS_DATA = 'pm_data_v2';
+const LS_THEME = 'pm_theme_v1';
+const STATUS_LABEL = {idea:'Идея', test:'В тесте', done:'Готово', archive:'Архив'};
+const STATUS_COLOR = {idea:'var(--warn)', test:'var(--info)', done:'var(--ok)', archive:'var(--text-muted)'};
+const MONTHS_SHORT = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+
+/* Тема */
+function getCurrentTheme(){
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+function applyTheme(t){
+  if(t === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  try{ localStorage.setItem(LS_THEME, t); }catch(e){}
+  updateThemeIcon();
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute('content', t === 'light' ? '#f4f1ec' : '#061e27');
+}
+function updateThemeIcon(){
+  const icon = document.getElementById('themeIcon');
+  if(!icon) return;
+  const t = getCurrentTheme();
+  if(t === 'light'){
+    icon.innerHTML = '<circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.7"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>';
+  } else {
+    icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+}
+function toggleTheme(){
+  applyTheme(getCurrentTheme() === 'light' ? 'dark' : 'light');
+}
+
+/* Утилиты */
+function esc(s){
+  return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function plural(n, one, few, many){
+  const m10 = n % 10, m100 = n % 100;
+  if(m10 === 1 && m100 !== 11) return one;
+  if(m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
+function calcFC(v){
+  if(!v) return null;
+  const cost = parseFloat(v.cost);
+  const price = parseFloat(v.price);
+  if(isNaN(cost) || isNaN(price) || price <= 0) return null;
+  return (cost / price) * 100;
+}
+function parseTags(str){
+  return String(str||'').split(',').map(t=>t.trim()).filter(Boolean);
+}
+
+/* Аналитика */
+function buildStats(items){
+  const stats = {
+    total: items.length,
+    totalVersions: 0,
+    byStatus: {idea:0, test:0, done:0, archive:0},
+    byCategory: {},
+    byDifficulty: {},
+    avgFC: null,
+    fcDistribution: {good:0, mid:0, bad:0},
+    topIngredients: [],
+    tagCloud: [],
+    monthly: {},
+    avgTime: null,
+    timesCount: 0
+  };
+
+  if(!items.length) return stats;
+
+  const ingMap = new Map();
+  const tagMap = new Map();
+  const fcList = [];
+  const timeList = [];
+
+  items.forEach(it=>{
+    stats.totalVersions += (it.versions || []).length;
+    const v = it.versions[it.currentVersion - 1];
+    if(!v) return;
+    const status = v.status || 'idea';
+    if(stats.byStatus[status] !== undefined) stats.byStatus[status]++;
+
+    if(it.cat){
+      stats.byCategory[it.cat] = (stats.byCategory[it.cat] || 0) + 1;
+    }
+    if(v.difficulty){
+      stats.byDifficulty[v.difficulty] = (stats.byDifficulty[v.difficulty] || 0) + 1;
+    }
+    const fc = calcFC(v);
+    if(fc !== null){
+      fcList.push(fc);
+      if(fc <= 25) stats.fcDistribution.good++;
+      else if(fc <= 35) stats.fcDistribution.mid++;
+      else stats.fcDistribution.bad++;
+    }
+    if(v.time){
+      const t = parseFloat(v.time);
+      if(!isNaN(t) && t > 0){ timeList.push(t); }
+    }
+
+    (v.ingredients || []).forEach(ing=>{
+      const name = (ing.name || '').trim();
+      if(!name) return;
+      const key = name.toLowerCase();
+      if(!ingMap.has(key)) ingMap.set(key, { name: name, count: 0 });
+      ingMap.get(key).count++;
+    });
+
+    parseTags(v.tags).forEach(t=>{
+      const key = t.toLowerCase();
+      if(!tagMap.has(key)) tagMap.set(key, { name: t, count: 0 });
+      tagMap.get(key).count++;
+    });
+
+    // Помесячно по created
+    const ts = it.created || it.updated;
+    if(ts){
+      const d = new Date(ts);
+      const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2,'0');
+      if(!stats.monthly[key]) stats.monthly[key] = { y: d.getFullYear(), m: d.getMonth(), count: 0 };
+      stats.monthly[key].count++;
+    }
+  });
+
+  if(fcList.length){
+    stats.avgFC = fcList.reduce((s,x)=>s+x, 0) / fcList.length;
+  }
+  if(timeList.length){
+    stats.avgTime = timeList.reduce((s,x)=>s+x, 0) / timeList.length;
+    stats.timesCount = timeList.length;
+  }
+
+  stats.topIngredients = Array.from(ingMap.values())
+    .sort((a,b)=>b.count - a.count)
+    .slice(0, 12);
+
+  stats.tagCloud = Array.from(tagMap.values())
+    .sort((a,b)=>b.count - a.count)
+    .slice(0, 30);
+
+  return stats;
+}
+
+/* Отрисовка */
+function render(){
+  const content = document.getElementById('content');
+  let items = [];
+  try{ items = JSON.parse(localStorage.getItem(LS_DATA)) || []; }
+  catch(e){ items = []; }
+
+  if(!items.length){
+    content.innerHTML = `
+      <div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 21h18M7 17V9M12 17V5M17 17v-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div style="font-size:15px;color:var(--text-secondary);margin-bottom:6px">Пока нет данных</div>
+        <div>Создай первую проработку, и здесь появится статистика</div>
+      </div>`;
+    return;
+  }
+
+  const s = buildStats(items);
+  const html = [];
+
+  /* ====== KPI ====== */
+  const avgFCClass = s.avgFC === null ? '' : (s.avgFC <= 25 ? 'ok' : s.avgFC <= 35 ? 'warn' : '');
+  html.push(`<div class="kpi-grid">
+    <div class="kpi accent">
+      <div class="kpi-label">Всего проработок</div>
+      <div class="kpi-value">${s.total}</div>
+      <div class="kpi-sub">${s.totalVersions} ${plural(s.totalVersions,'версия','версии','версий')}</div>
+    </div>
+    <div class="kpi ${avgFCClass}">
+      <div class="kpi-label">Средний FC</div>
+      <div class="kpi-value">${s.avgFC !== null ? s.avgFC.toFixed(1) + '%' : '—'}</div>
+      <div class="kpi-sub">${s.fcDistribution.good + s.fcDistribution.mid + s.fcDistribution.bad} ${plural(s.fcDistribution.good + s.fcDistribution.mid + s.fcDistribution.bad,'запись','записи','записей')} с FC</div>
+    </div>
+    <div class="kpi info">
+      <div class="kpi-label">В работе</div>
+      <div class="kpi-value">${s.byStatus.test}</div>
+      <div class="kpi-sub">${s.byStatus.idea} ${plural(s.byStatus.idea,'идея','идеи','идей')} в очереди</div>
+    </div>
+    <div class="kpi ok">
+      <div class="kpi-label">Готово</div>
+      <div class="kpi-value">${s.byStatus.done}</div>
+      <div class="kpi-sub">${s.byStatus.archive} в архиве</div>
+    </div>
+  </div>`);
+
+  /* ====== По статусам ====== */
+  const total = s.total || 1;
+  const statusRows = ['done','test','idea','archive'].map(st=>{
+    const c = s.byStatus[st] || 0;
+    const pct = (c / total) * 100;
+    return `<div class="bar-row">
+      <div class="bar-label">${STATUS_LABEL[st]}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${STATUS_COLOR[st]}"></div></div>
+      <div class="bar-value">${c}</div>
+    </div>`;
+  }).join('');
+  html.push(`<div class="section">
+    <div class="section-title">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 12h4l3 8 4-16 3 8h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      По статусам
+    </div>
+    ${statusRows}
+  </div>`);
+
+  /* ====== FC распределение ====== */
+  const totalFC = s.fcDistribution.good + s.fcDistribution.mid + s.fcDistribution.bad;
+  if(totalFC > 0){
+    html.push(`<div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="7" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="17" cy="17" r="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="m19 5-14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Распределение по FC
+      </div>
+      <div class="fc-dist">
+        <div class="fc-cell good">
+          <div class="label">≤ 25% · отлично</div>
+          <div class="value">${s.fcDistribution.good}</div>
+        </div>
+        <div class="fc-cell mid">
+          <div class="label">25–35% · норма</div>
+          <div class="value">${s.fcDistribution.mid}</div>
+        </div>
+        <div class="fc-cell bad">
+          <div class="label">&gt; 35% · дорого</div>
+          <div class="value">${s.fcDistribution.bad}</div>
+        </div>
+      </div>
+    </div>`);
+  }
+
+  /* ====== По категориям ====== */
+  const catEntries = Object.entries(s.byCategory).sort((a,b)=>b[1]-a[1]);
+  if(catEntries.length){
+    const maxCat = catEntries[0][1];
+    html.push(`<div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        По категориям
+      </div>
+      ${catEntries.map(([c, n])=>{
+        const pct = (n / maxCat) * 100;
+        return `<div class="bar-row">
+          <div class="bar-label">${esc(c)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <div class="bar-value">${n}</div>
+        </div>`;
+      }).join('')}
+    </div>`);
+  }
+
+  /* ====== По сложности ====== */
+  const diffEntries = Object.entries(s.byDifficulty).sort((a,b)=>b[1]-a[1]);
+  if(diffEntries.length){
+    const maxDiff = diffEntries[0][1];
+    html.push(`<div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        По сложности
+      </div>
+      ${diffEntries.map(([d, n])=>{
+        const pct = (n / maxDiff) * 100;
+        return `<div class="bar-row">
+          <div class="bar-label">${esc(d)}</div>
+          <div class="bar-track"><div class="bar-fill info" style="width:${pct}%"></div></div>
+          <div class="bar-value">${n}</div>
+        </div>`;
+      }).join('')}
+    </div>`);
+  }
+
+  /* ====== Топ ингредиентов ====== */
+  if(s.topIngredients.length){
+    const maxIng = s.topIngredients[0].count;
+    html.push(`<div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 3h6M10 3v5.5L5.5 17a2.5 2.5 0 0 0 2.2 3.5h8.6a2.5 2.5 0 0 0 2.2-3.5L14 8.5V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Топ ингредиентов
+      </div>
+      ${s.topIngredients.map(ing=>{
+        const pct = (ing.count / maxIng) * 100;
+        return `<div class="bar-row">
+          <div class="bar-label">${esc(ing.name)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <div class="bar-value">${ing.count}</div>
+        </div>`;
+      }).join('')}
+    </div>`);
+  }
+
+  /* ====== Облако тегов ====== */
+  if(s.tagCloud.length){
+    const maxTag = s.tagCloud[0].count;
+    html.push(`<div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        Облако тегов
+      </div>
+      <div class="tag-cloud">
+        ${s.tagCloud.map(t=>{
+          const cls = t.count >= maxTag * 0.8 ? 'huge' : (t.count >= maxTag * 0.4 ? 'big' : '');
+          return `<span class="tag ${cls}">#${esc(t.name)} <span style="opacity:.5">${t.count}</span></span>`;
+        }).join('')}
+      </div>
+    </div>`);
+  }
+
+  /* ====== Динамика по месяцам ====== */
+  const monthly = Object.values(s.monthly).sort((a,b)=>{
+    if(a.y !== b.y) return a.y - b.y;
+    return a.m - b.m;
+  });
+  if(monthly.length > 1){
+    const last = monthly.slice(-12);
+    const maxM = Math.max(...last.map(m=>m.count));
+    html.push(`<div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 3v18h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M7 14l4-4 4 4 5-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Динамика добавления
+      </div>
+      <div class="chart">
+        ${last.map(m=>{
+          const h = maxM ? (m.count / maxM) * 100 : 0;
+          return `<div class="chart-col">
+            <div class="chart-val">${m.count}</div>
+            <div class="chart-bar" style="height:${h}%"></div>
+            <div class="chart-label">${MONTHS_SHORT[m.m]}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`);
+  }
+
+  /* ====== Среднее время ====== */
+  if(s.avgTime !== null){
+    html.push(`<div class="section">
+      <div class="section-title">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Время приготовления
+      </div>
+      <div class="fc-dist">
+        <div class="fc-cell">
+          <div class="label">Среднее</div>
+          <div class="value" style="color:var(--info)">${s.avgTime.toFixed(1)} мин</div>
+        </div>
+        <div class="fc-cell">
+          <div class="label">Записей с временем</div>
+          <div class="value">${s.timesCount}</div>
+        </div>
+      </div>
+    </div>`);
+  }
+
+  content.innerHTML = html.join('');
+}
+
+/* Init */
+updateThemeIcon();
+render();
+</script>
+</body>
+</html>

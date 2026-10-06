@@ -214,23 +214,31 @@
       </div>
 
       <div class="field">
-        <div class="ing-head">
-          <label>Ингредиенты</label>
-          <button class="btn ghost small" onclick="addIng()">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-            Добавить
-          </button>
-        </div>
-        <div id="ing-list"></div>
-        <div class="ing-add-float" id="ingAddFloat" onclick="addIng()">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-          </svg>
-          Ещё ингредиент
-        </div>
-      </div>
+  <div class="ing-head">
+    <label>Ингредиенты</label>
+    <div style="display:flex;gap:4px">
+      <button class="btn ghost small" onclick="openParser()" title="Разобрать текст">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 7h16M4 12h10M4 17h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Разобрать
+      </button>
+      <button class="btn ghost small" onclick="addIng()" title="Добавить вручную">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        Добавить
+      </button>
+    </div>
+  </div>
+  <div id="ing-list"></div>
+  <div class="ing-add-float" id="ingAddFloat" onclick="addIng()">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+    </svg>
+    Ещё ингредиент
+  </div>
+</div>
 
       <div class="row-4">
         <div class="field">
@@ -493,5 +501,35 @@
 <div class="toast" id="toast"></div>
 
 <script src="app.js"></script>
+  <!-- Парсер ингредиентов -->
+<div class="overlay" id="parserOverlay">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:560px">
+    <div class="modal-head">
+      <h2>Разобрать текст</h2>
+      <button class="btn ghost small" onclick="closeParser()" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="hint" style="margin-top:0;margin-bottom:14px">
+        Вставь строку с ингредиентами — например:<br>
+        <code>Джин 40 мл, лайм 20 мл, сироп 15 мл</code>
+      </div>
+      <div class="field">
+        <label>Текст</label>
+        <textarea id="parser-input" placeholder="Ингредиент количество единица, через запятую или с новой строки..."></textarea>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Предпросмотр</label>
+        <div id="parser-preview" class="share-preview">—</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <div></div>
+      <div class="right">
+        <button class="btn" onclick="closeParser()">Отмена</button>
+        <button class="btn primary" onclick="applyParser()">Добавить</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

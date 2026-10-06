@@ -484,6 +484,117 @@ document.addEventListener('click', e=>{
     closeStatusPopover();
   }
 });
+
+/* ====== ПАРСЕР ИНГРЕДИЕНТОВ ====== */
+function openParser(){
+  const input = document.getElementById('parser-input');
+  const prev = document.getElementById('parser-preview');
+  if(!input || !prev) return;
+  input.value = '';
+  prev.textContent = '—';
+  document.getElementById('parserOverlay').classList.add('open');
+  setTimeout(()=>input.focus(), 100);
+}
+function closeParser(){
+  const el = document.getElementById('parserOverlay');
+  if(el) el.classList.remove('open');
+}
+
+function parseIngredientLine(line){
+  let s = line.trim().replace(/^[•\-*]\s*/, '');
+  if(!s) return null;
+  const unitPattern = '(мл|ml|г|гр|g|кг|kg|л|l|шт|pcs|dash|дэш|кап|капли|щепотка|bitters|біттер|бітер)';
+  let name = '', qty = '', unit = '';
+
+  let m = s.match(new RegExp('^(.+?)\\s*[—–\\-:]?\\s*([\\d.,/]+)\\s*' + unitPattern + '?\\s*$', 'i'));
+  if(m){
+    name = m[1].trim();
+    qty = m[2].trim();
+    unit = (m[3] || '').trim().toLowerCase();
+    if(/^[\d.,/]+$/.test(name) && !m[3]){
+      name = '';
+    }
+  } else {
+    m = s.match(new RegExp('^([\\d.,/]+)\\s*' + unitPattern + '?\\s+(.+)$', 'i'));
+    if(m){
+      qty = m[1].trim();
+      unit = (m[2] || '').trim().toLowerCase();
+      name = m[3].trim();
+    } else {
+      name = s;
+    }
+  }
+
+  const unitMap = {
+    'ml':'мл', 'мл':'мл',
+    'g':'г', 'гр':'г', 'г':'г',
+    'kg':'кг', 'кг':'кг',
+    'l':'л', 'л':'л',
+    'pcs':'шт', 'шт':'шт',
+    'dash':'дэш', 'дэш':'дэш',
+    'кап':'кап', 'капли':'кап',
+    'щепотка':'щепотка',
+    'bitters':'биттер', 'біттер':'биттер', 'бітер':'биттер'
+  };
+  if(unit && unitMap[unit]) unit = unitMap[unit];
+
+  if(!name) return null;
+  return { name, qty, unit };
+}
+
+function parseIngredientsText(text){
+  if(!text) return [];
+  const parts = String(text)
+    .split(/[\n;,]+/)
+    .map(s=>s.trim())
+    .filter(Boolean);
+  const out = [];
+  parts.forEach(p=>{
+    const ing = parseIngredientLine(p);
+    if(ing) out.push(ing);
+  });
+  return out;
+}
+
+function updateParserPreview(){
+  const input = document.getElementById('parser-input');
+  const el = document.getElementById('parser-preview');
+  if(!input || !el) return;
+  const ings = parseIngredientsText(input.value);
+  if(!ings.length){
+    el.textContent = '—';
+    return;
+  }
+  el.textContent = ings.map(i=>{
+    const qty = i.qty ? ' — ' + i.qty + (i.unit?' '+i.unit:'') : '';
+    return '• ' + i.name + qty;
+  }).join('\n');
+}
+
+function applyParser(){
+  const input = document.getElementById('parser-input');
+  if(!input) return;
+  const ings = parseIngredientsText(input.value);
+  if(!ings.length){
+    toast('Не удалось ничего разобрать');
+    return;
+  }
+  const list = document.getElementById('ing-list');
+  const emptyRows = Array.from(list.querySelectorAll('.ing-row')).filter(r=>{
+    const inputs = r.querySelectorAll('input');
+    return !inputs[0].value.trim() && !inputs[1].value.trim();
+  });
+  emptyRows.forEach(r=>r.remove());
+  ings.forEach(ing=>addIng(ing));
+  scheduleDraft();
+  closeParser();
+  toast('Добавлено: ' + ings.length);
+}
+
+document.addEventListener('input', e=>{
+  if(e.target.id === 'parser-input') updateParserPreview();
+});
+
 /* ====== РЕДАКТОР ====== */
 function openEditor(id){
   editingId = id || null;
@@ -1473,10 +1584,13 @@ document.getElementById('historyOverlay').addEventListener('click', e=>{
 document.getElementById('copyFromOverlay').addEventListener('click', e=>{
   if(e.target.id === 'copyFromOverlay') closeCopyFrom();
 });
+document.getElementById('parserOverlay').addEventListener('click', e=>{
+  if(e.target.id === 'parserOverlay') closeParser();
+});
 document.addEventListener('keydown', e=>{
   if(e.key === 'Escape'){
     closeEditor(); closeSettings(); closeShare(); closeShareMulti();
-    closeHistory(); closeCopyFrom(); closeStatusPopover(); closeStatusPicker();
+    closeHistory(); closeCopyFrom(); closeStatusPopover(); closeStatusPicker(); closeParser();
   }
   if((e.metaKey||e.ctrlKey) && e.key === 'Enter' && document.getElementById('overlay').classList.contains('open')){
     saveCurrent();
